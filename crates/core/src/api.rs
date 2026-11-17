@@ -107,6 +107,10 @@ pub async fn play_single(
     from: Option<String>,
 ) -> Result<(), String> {
     let state = state.clone();
+    // ── stream: podcast-upnext ── an episode gets the podcast queue (history, its show's next).
+    if crate::podcasts::is_episode_item(&item) {
+        return play_playlist(&state, vec![item], Some(0), None, from, None, None, None, None).await;
+    }
     state.play_single(item, from).await;
     Ok(())
 }
@@ -1004,6 +1008,17 @@ pub async fn play_playlist(
     let state = state.clone();
     // ── stream: smart ── hidden songs, blocked artists and (filter on) explicit never play.
     let (items, start) = crate::smart::recs::playable(&state.db, items, start);
+    // ── stream: podcast-upnext ── an episode's queue is the one before it, it, and its show's
+    // next; autoplay predicts the rest (`podcasts::upnext`).
+    let picked = items.get(start.unwrap_or(0)).filter(|s| crate::podcasts::is_episode_item(s)).is_some();
+    let (items, start, shuffle) = if picked {
+        let history = state.current_item().await;
+        let (q, at) =
+            crate::podcasts::upnext::context_queue(&state.db.podcasts_conn(), &items, start.unwrap_or(0), history);
+        (q, Some(at), Some(false))
+    } else {
+        (items, start, shuffle)
+    };
     state.open_at(items.get(start.unwrap_or(0)), start_secs);
     state
         .play_tracks(items, start, source_id, source_name, shuffle.unwrap_or(false), continuation)

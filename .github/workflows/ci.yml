@@ -80,4 +80,6 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: cargo test (core crates)
-        run: cargo test --locked -p encore-core -p innertube -p player -p encore-ffi
+        # The real-time crossfade test plays audio against the wall clock; a 3-core hosted runner
+        # can't keep both decks fed, so it is skipped here (it runs locally and before releases).
+        run: cargo test --locked -p encore-core -p innertube -p player -p encore-ffi -- --skip automatic_crossfade_runs_both_effected_decks_in_real_time

@@ -71,7 +71,28 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
     )?;
     // stream: chapters. An error here means the column is already there.
     let _ = conn.execute("ALTER TABLE podcast_episodes ADD COLUMN chapters_url TEXT", []);
+    // stream: podcast-upnext. Same.
+    let _ = conn.execute("ALTER TABLE podcast_show_meta ADD COLUMN serial INTEGER", []);
     Ok(())
+}
+
+/// stream: podcast-upnext. Remember whether a feed calls itself serial ([`Show::serial`]).
+pub fn set_serial(conn: &Connection, show_id: &str, serial: bool) {
+    let _ = conn.execute(
+        "INSERT INTO podcast_show_meta(show_id, serial) VALUES(?1, ?2)
+         ON CONFLICT(show_id) DO UPDATE SET serial = excluded.serial",
+        params![show_id, serial as i64],
+    );
+}
+
+/// stream: podcast-upnext. Whether the show's feed said it is serial (unknown reads as episodic).
+pub fn is_serial(conn: &Connection, show_id: &str) -> bool {
+    conn.query_row("SELECT serial FROM podcast_show_meta WHERE show_id = ?1", [show_id], |r| {
+        r.get::<_, Option<i64>>(0)
+    })
+    .ok()
+    .flatten()
+    .is_some_and(|v| v != 0)
 }
 
 // --- follows -------------------------------------------------------------------------------------
@@ -132,6 +153,7 @@ pub fn follows(conn: &Connection) -> rusqlite::Result<Vec<Show>> {
             episode_count: None,
             dir_author: None,
             chart_rank: None,
+            serial: false,
         })
     })?;
     rows.collect()

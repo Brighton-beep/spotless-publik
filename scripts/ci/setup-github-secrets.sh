@@ -233,8 +233,9 @@ else
 fi
 unset KEY_PASS
 
-say "Done. Secrets set in $REPO (names only):"
-for s in "${SET[@]}"; do echo "  $s"; done
+say "Done. Secrets now in $REPO (names only):"
+# Ask GitHub: put_secret runs at the end of pipes (subshells), so SET only sees the last one.
+gh secret list --repo "$REPO" | awk '{print "  " $1}'
 echo
 echo "Next: in the public repo's checkout (~/music-app/public-snapshot) push a release tag, e.g."
 echo "  git tag -a v1.0.0 -m 'Spotless 1.0.0' && git push origin v1.0.0"

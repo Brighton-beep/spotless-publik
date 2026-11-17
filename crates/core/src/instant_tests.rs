@@ -183,3 +183,98 @@ fn play_playlist_opens_the_start_row_at_start_secs() {
     });
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// ── stream: podcast-upnext ── An episode played from its show page queues the show's next
+/// episode ("From …"), then autoplay brings a followed show's new episode ("Because you follow …");
+/// the episode that was playing before stays behind it for Previous, and an ending episode runs on
+/// into the prediction. Episodes are local WAVs flagged `is_episode`, so nothing streams.
+#[test]
+fn an_episode_plays_on_into_its_predicted_next() {
+    use crate::podcasts::{store, Episode, Show};
+    let dir = std::env::temp_dir().join(format!("encore-upnext-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let now = crate::podcasts::now_secs();
+    let ep = |name: &str, show: &str, at: i64| {
+        let path = dir.join(format!("{name}.wav"));
+        wav_secs(&path, 3); // long enough for the queue to be read before it ends
+        Episode {
+            id: song(&path).video_id,
+            show_id: Some(show.into()),
+            show_title: format!("{show} Show"),
+            title: name.into(),
+            published_at: Some(at),
+            ..Default::default()
+        }
+    };
+    let (s1, s2, s3) = (ep("s1", "S", now - 300), ep("s2", "S", now - 200), ep("s3", "S", now - 100));
+    let f1 = ep("f1", "F", now - 50);
+    let other = ep("other", "O", now - 1000);
+
+    let rec = Arc::new(Recorder { dir: dir.clone(), events: Mutex::default() });
+    let db = crate::boot::open_db(&dir).unwrap();
+    let Ok(booted) = crate::boot::assemble(rec.clone(), db, None, None) else {
+        eprintln!("no libmpv here; skipping");
+        return;
+    };
+    let mut booted = booted;
+    let st = booted.state.clone();
+    let _ = st.player.set_volume(0);
+    if let Some(events) = booted.events.take() {
+        crate::boot::spawn_event_pump(st.clone(), events); // track ends advance the queue
+    }
+    {
+        let c = st.db.podcasts_conn();
+        store::init(&c).unwrap(); // the app's setup hook does this
+        store::upsert_episodes(&c, &[s1.clone(), s2.clone(), s3.clone(), f1.clone(), other.clone()]).unwrap();
+        store::follow(&c, &Show { id: "F".into(), title: "F Show".into(), ..Default::default() }).unwrap();
+    }
+    let ids = |q: &serde_json::Value| -> Vec<String> {
+        q["items"].as_array().unwrap().iter().map(|i| i["video_id"].as_str().unwrap().to_owned()).collect()
+    };
+
+    crate::rt::handle().block_on(async {
+        // Something else was playing: it stays behind the new episode.
+        crate::api::play_single(&st, other.song(), None).await.unwrap();
+        // The show page, newest first; the oldest is tapped.
+        let page = vec![s3.song(), s2.song(), s1.song()];
+        crate::api::play_playlist(&st, page, Some(2), None, Some("S Show".into()), None, None, None, None)
+            .await
+            .unwrap();
+        // Autoplay's followed block lands right after the start (local, no network).
+        let mut q = st.queue_snapshot().await;
+        for _ in 0..100 {
+            if ids(&q).len() >= 4 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            q = st.queue_snapshot().await;
+        }
+        assert_eq!(&ids(&q)[..4], [other.id.as_str(), &s1.id, &s2.id, &f1.id], "{q}");
+        assert_eq!(q["currentIndex"], 1);
+        assert_eq!(q["items"][2]["reason"], "From S Show");
+        assert_eq!(q["items"][2]["autoplay"], false);
+        assert_eq!(q["items"][3]["reason"], "Because you follow F Show");
+        assert_eq!(q["items"][3]["autoplay"], true);
+
+        // Autoplay off takes the prediction away, but not the show's own next.
+        st.db.set_setting("autoplay", "false");
+        st.autoplay_changed(false).await;
+        assert_eq!(ids(&st.queue_snapshot().await), [other.id.as_str(), &s1.id, &s2.id]);
+        st.db.set_setting("autoplay", "true");
+        st.autoplay_changed(true).await;
+        assert!(ids(&st.queue_snapshot().await).contains(&f1.id));
+
+        // The episode ends: the queue runs on into the show's next.
+        let mut cur = String::new();
+        for _ in 0..400 {
+            let q = st.queue_snapshot().await;
+            cur = ids(&q)[q["currentIndex"].as_u64().unwrap() as usize].clone();
+            if cur != s1.id {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        assert_eq!(cur, s2.id);
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+}

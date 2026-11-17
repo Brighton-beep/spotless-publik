@@ -420,7 +420,22 @@ final class MockCoreClient: CoreClient, @unchecked Sendable {
         withLock {
             var l = list
             var at = start
-            if shuf {
+            // Podcast up next, as the core builds it (podcasts/upnext.rs, simplified): the episode
+            // that was playing, the one picked, and the next one from its list, with its reason.
+            if l.indices.contains(start), l[start].isEpisode == true {
+                let prior = items.indices.contains(current) ? items[current] : nil
+                var q: [SongItem] = []
+                if let p = prior, p.isEpisode == true, p.videoId != l[start].videoId { q.append(p) }
+                at = q.count
+                q.append(l[start])
+                if l.indices.contains(start + 1) {
+                    var next = l[start + 1]
+                    next.reason = "From \(next.artists)"
+                    q.append(next)
+                }
+                l = q
+            }
+            if shuf && l.first?.isEpisode != true {
                 let head = l.indices.contains(start) && start > 0 ? [l.remove(at: start)] : []
                 l = head + l.shuffled()
                 at = 0

@@ -60,6 +60,9 @@ export interface SongItem {
 	queued_from?: string;
 	/** Appended by autoplay radio continuation — drives the queue's "Autoplay" divider + badge. */
 	autoplay?: boolean;
+	/** Why the core put this episode next ("From …", "Because you follow …", "Popular in …"):
+	 *  podcast up next. The queue rows show it in place of the show name. */
+	reason?: string;
 	/** YouTube flags the track explicit. Browse/search rows only: `/next` carries no badge, so a
 	 *  radio- or autoplay-appended track arrives without it. */
 	explicit?: boolean;

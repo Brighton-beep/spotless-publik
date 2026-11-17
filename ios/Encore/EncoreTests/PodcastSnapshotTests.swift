@@ -33,6 +33,24 @@ final class PodcastSnapshotTests: SnapshotCase {
             if let e = try? await app.core.podcastEpisode(id: "wbJ_Q1xsDHg") { app.sheet = .episode(e) }
         })
     }
+    /// stream: podcast-upnext — the queue after an episode: one "Next up" block (the show's next,
+    /// then Autoplay's predictions), each row with the core's reason where the show name was.
+    func testQueuePodcastUpNext() async {
+        await snap("encore://play-episode/1rn_Clc-MM0?pause=1", setup: { app in
+            var rows: [SongItem] = []
+            for f in ((try? await app.core.podcastFollows()) ?? []).prefix(3) {
+                if let p = try? await app.core.podcastShow(id: f.id, sort: .newest) { rows += p.episodes.prefix(2).map(\.song) }
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+            guard let cur = app.player.current, rows.count >= 4 else { return XCTFail("no episode fixtures") }
+            var next = rows[0]; next.reason = "From \(next.artists)"
+            var follow = rows[2]; follow.reason = "Because you follow \(follow.artists)"; follow.autoplay = true
+            var pop = rows[3]; pop.reason = "Popular in Business · \(pop.artists)"; pop.autoplay = true
+            app.player.queue = QueueState(items: [rows[1], cur, next, follow, pop], currentIndex: 1, sourceName: cur.artists)
+            if let u = URL(string: "encore://queue") { app.router.handle(u, app: app) }
+        }, wait: 1.2)
+    }
+
     /// Now Playing's ⋯ for an episode (the track sheet) offers Download too.
     func testNowPlayingEpisodeSheet() async {
         await snap("encore://play-episode/1rn_Clc-MM0?open=1&pause=1", setup: { app in

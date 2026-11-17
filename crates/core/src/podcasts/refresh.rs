@@ -122,6 +122,9 @@ pub async fn refresh_show(st: &AppState, show: &Show) -> Result<Vec<Episode>, St
     if let Some(m) = &meta {
         let _ = store::update_follow_meta(&conn, &show.id, m);
         store::remember_show_art(&conn, &show.id, m.thumbnail.as_deref()); // stream: tilefix
+        if !show.is_youtube() {
+            store::set_serial(&conn, &show.id, m.serial); // stream: podcast-upnext
+        }
     }
     let fresh = store::upsert_episodes(&conn, &episodes).map_err(|e| e.to_string())?;
     let _ = store::set_feed_state(

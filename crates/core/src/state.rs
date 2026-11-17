@@ -1599,6 +1599,9 @@ impl AppState {
             // across queues (issue #117: off by default, so an album opened while shuffle is on
             // plays in order).
             let keep_shuffled = shuffle || (sticky && q.shuffle_orig.is_some());
+            // ── stream: podcast-upnext ── an episode's queue is in listening order, never shuffled.
+            let keep_shuffled = keep_shuffled
+                && !start.and_then(|i| items.get(i)).is_some_and(crate::podcasts::is_episode_item);
             let start = match start {
                 Some(i) => i.min(items.len() - 1),
                 None if keep_shuffled => {
@@ -2820,7 +2823,7 @@ impl AppState {
         tracing::debug!(index = next_idx, "gapless lookahead primed");
     }
 
-    async fn current_item(&self) -> Option<SongItem> {
+    pub(crate) async fn current_item(&self) -> Option<SongItem> {
         let q = self.queue.lock().await;
         q.items.get(q.current).cloned()
     }
@@ -3697,6 +3700,11 @@ impl AppState {
     /// returns nothing new, playback later stops exactly as pre-autoplay (no retry loop).
     async fn extend_queue_radio(self: &std::sync::Arc<Self>, gen: u64) -> usize {
         const AUTOPLAY_BATCH: usize = 20;
+        // ── stream: podcast-upnext ── an episode at the tail continues with episodes, never music.
+        let podcast = self.queue.lock().await.items.last().is_some_and(crate::podcasts::is_episode_item);
+        if podcast {
+            return self.extend_podcasts(gen).await;
+        }
         let plan = {
             let q = self.queue.lock().await;
             if q.hydrating == Some(gen) {
@@ -3780,6 +3788,71 @@ impl AppState {
         };
         self.absorb_radio(fresh, gen, &seed, AUTOPLAY_BATCH, &anchors).await
     }
+
+    // ── stream: podcast-upnext ──
+    /// Autoplay for a queue ending on an episode (`podcasts::upnext`): your followed shows' new
+    /// episodes, the shows you listen to most first, then one popular episode from a show like the
+    /// one playing. The followed block lands at once (local); the discovery pick follows when the
+    /// (cached) charts answer, in the background unless nothing else came.
+    async fn extend_podcasts(self: &std::sync::Arc<Self>, gen: u64) -> usize {
+        use crate::podcasts::upnext;
+        if !self.autoplay_enabled() {
+            return 0;
+        }
+        let (items, current) = {
+            let q = self.queue.lock().await;
+            if q.hydrating == Some(gen)
+                || q.repeat != RepeatMode::Off
+                || q.items.len().saturating_sub(q.current) > 2
+            {
+                return 0;
+            }
+            (q.items.clone(), q.current)
+        };
+        let seed = items.get(current).map(|s| s.artists.clone()).unwrap_or_default();
+        let (mut taken, picks) = {
+            let conn = self.db.podcasts_conn();
+            let taken = upnext::taken(&conn, &items, current);
+            let picks = upnext::followed(&conn, &taken);
+            (taken, picks)
+        };
+        let added = self.append_upnext(gen, picks.iter().map(upnext::Pick::song).collect()).await;
+        for p in &picks {
+            taken.add(&p.episode);
+        }
+        upnext::add_follows(&self.db.podcasts_conn(), &mut taken);
+        let me = self.clone();
+        let discovery = async move {
+            let Some(pick) = upnext::discover(&me.db, &seed, &taken).await else { return 0 };
+            me.append_upnext(gen, vec![pick.song()]).await
+        };
+        if added > 0 {
+            crate::rt::spawn(discovery);
+            return added;
+        }
+        discovery.await
+    }
+
+    /// Append predicted episodes to the tail as autoplay rows (the panels' "Next up"), unless the
+    /// queue moved on or Autoplay was switched off meanwhile.
+    async fn append_upnext(self: &std::sync::Arc<Self>, gen: u64, rows: Vec<SongItem>) -> usize {
+        if rows.is_empty() || self.generation.load(Ordering::SeqCst) != gen || !self.autoplay_enabled() {
+            return 0;
+        }
+        let added = {
+            let mut q = self.queue.lock().await;
+            let existing: HashSet<String> = q.items.iter().map(|i| i.video_id.clone()).collect();
+            merge_radio(&mut q.items, rows, existing, usize::MAX)
+        };
+        if added > 0 {
+            tracing::info!(added, "podcast up next extended the queue");
+            self.emit_queue_appended(added).await;
+            self.persist_queue().await;
+            self.prime_lookahead(gen).await;
+        }
+        added
+    }
+    // ── end stream: podcast-upnext ──
 
     /// Append a fetched radio page to the tail of the queue and run the bookkeeping that follows.
     /// Returns how many tracks landed. The generation check lives here because every caller was on

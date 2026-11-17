@@ -19,6 +19,9 @@ export interface QueueView {
 	autoplay: QueueRow[];
 	/** Upcoming tracks added by hand ("Play next" / "Add to queue"): what Clear queue removes. */
 	queued: number;
+	/** The block after the playing row is podcast up next (episodes the core predicted, each with
+	 *  its `reason`): the panel heads it "Next up" rather than "Autoplay". */
+	upNext: boolean;
 }
 
 /**
@@ -28,7 +31,8 @@ export interface QueueView {
  * blocks made a long playlist read like several lists, with the headings shifting on every track.
  *
  * Autoplay is the one split, and only ahead of the playing track: tracks autoplay brought in that
- * have already played are ordinary rows of what was played.
+ * have already played are ordinary rows of what was played. After an episode the split is podcast
+ * up next, which starts at the first predicted episode (the show's next, then autoplay's).
  */
 export function queueView(q: QueueState): QueueView {
 	const { items, currentIndex } = q;
@@ -44,10 +48,11 @@ export function queueView(q: QueueState): QueueView {
 		if (upcoming && (item.queued || item.queued_end)) queued++;
 		// Once autoplay starts, the rest goes with it: a row dragged in among its tracks is still
 		// drawn where it will play.
-		const into = autoplay.length || (upcoming && item.autoplay) ? autoplay : rows;
+		// A predicted episode (it has a reason) starts the block too, the show's own next included.
+		const into = autoplay.length || (upcoming && (item.autoplay || item.reason)) ? autoplay : rows;
 		into.push({ item, key: `${item.video_id}:${occ}`, i });
 	}
-	return { rows, autoplay, queued };
+	return { rows, autoplay, queued, upNext: !!autoplay[0]?.item.is_episode };
 }
 
 /** What is left to play before autoplay takes over: tracks after the playing one, and their total

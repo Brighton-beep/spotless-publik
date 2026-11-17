@@ -124,6 +124,11 @@ pub struct SongItem {
     /// files, Your Rotation), where there is nothing to send.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub library: Option<LibraryToggle>,
+    /// Why the app put this row next (podcast up next: "From <show>", "Because you follow <show>",
+    /// "Popular in Business · <show>"). The queue panels show it instead of the show name. Pure
+    /// queue metadata, never parsed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// One stretch of a song that plays in both versions: `start_ms` into this one, `twin_start_ms`
@@ -665,6 +670,7 @@ pub(crate) fn parse_list_item(node: &Value) -> Option<SongItem> {
         is_episode: is_episode_row(node),
         explicit: is_explicit(node),
         library: library_toggle(node),
+        reason: None,
     })
 }
 
@@ -999,6 +1005,7 @@ fn parse_panel_video(node: &Value) -> Option<SongItem> {
         // flag up for free if YouTube ever adds one.
         explicit: is_explicit(node),
         library: library_toggle(node),
+        reason: None,
     })
 }
 

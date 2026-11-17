@@ -46,9 +46,12 @@
 		selection,
 		selectionKey,
 		lazy = false,
-		trailing
+		trailing,
+		subtitle
 	}: {
 		song: SongItem;
+		/** Replaces the artist line: the queue's podcast up next shows why an episode is next. */
+		subtitle?: string;
 		/** Position badge when set (playlist/queue); omitted for flat search results. */
 		index?: number;
 		active?: boolean;
@@ -327,7 +330,11 @@
 				{#if columns && song.explicit}
 					<ExplicitIcon class="mr-0.5 h-3.5 w-3.5 shrink-0" />
 				{/if}
-				<ArtistLine runs={song.artist_runs} text={song.artists} />
+				{#if subtitle}
+					<span class="min-w-0 truncate">{subtitle}</span>
+				{:else}
+					<ArtistLine runs={song.artist_runs} text={song.artists} />
+				{/if}
 				{#if compact && duration}
 					<!-- No leading dot with nothing before it: a search row can come back artist-less
 					     (YouTube drops the name when the query is the artist), leaving the length alone

@@ -34,6 +34,7 @@ pub mod sanitize;
 pub mod search;
 pub mod sponsorblock;
 pub mod store;
+pub mod upnext; // stream: podcast-upnext
 pub mod video; // stream: video-pods
 pub mod youtube;
 
@@ -129,6 +130,10 @@ pub struct Show {
     /// directory's country, when it is on it. A popularity signal for search ranking.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chart_rank: Option<u32>,
+    /// stream: podcast-upnext — the feed says `<itunes:type>serial</itunes:type>`: episodes are
+    /// meant to be heard oldest first, so up next never goes back to an older one.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub serial: bool,
 }
 
 impl Show {

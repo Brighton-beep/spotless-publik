@@ -45,6 +45,7 @@ pub fn parse_feed(feed_url: &str, bytes: &[u8]) -> Result<(Show, Vec<Episode>), 
         description,
         feed_url: Some(feed_url.to_owned()),
         source: ShowSource::Rss,
+        serial: is_serial_feed(bytes),
         ..Default::default()
     };
     // feed-rs reads an `MM:SS` itunes:duration ("45:10") as 45 seconds, and that form is common,
@@ -134,6 +135,17 @@ fn itunes_durations(bytes: &[u8]) -> Vec<Option<i64>> {
         .collect()
 }
 
+/// stream: podcast-upnext. The channel's `<itunes:type>serial</itunes:type>` (feed-rs drops it).
+fn is_serial_feed(bytes: &[u8]) -> bool {
+    use regex::bytes::Regex;
+    use std::sync::OnceLock;
+    static TYPE: OnceLock<Regex> = OnceLock::new();
+    let re = TYPE.get_or_init(|| Regex::new(r"(?is)<itunes:type>\s*serial\s*</itunes:type>").unwrap());
+    // Only the channel's: the part before the first item.
+    let head = Regex::new(r"(?i)<item\b").ok().and_then(|r| r.find(bytes)).map_or(bytes.len(), |m| m.start());
+    re.is_match(&bytes[..head])
+}
+
 /// Each `<item>`'s `<podcast:chapters url=…>` (JSON chapters), in document order.
 fn item_chapter_urls(bytes: &[u8]) -> Vec<Option<String>> {
     use regex::bytes::Regex;
@@ -217,6 +229,15 @@ mod tests {
     fn feed() -> (Show, Vec<Episode>) {
         let p = format!("{}/src/podcasts/fixtures/feed.xml", env!("CARGO_MANIFEST_DIR"));
         parse_feed("https://example.com/feed.xml", &std::fs::read(p).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn serial_type_is_the_channels() {
+        let serial = br#"<rss><channel><itunes:type> serial </itunes:type><item><title>a</title></item></channel></rss>"#;
+        assert!(is_serial_feed(serial));
+        let item_only = br#"<rss><channel><itunes:type>episodic</itunes:type><item><itunes:type>serial</itunes:type></item></channel></rss>"#;
+        assert!(!is_serial_feed(item_only));
+        assert!(!feed().0.serial);
     }
 
     #[test]

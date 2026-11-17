@@ -76,6 +76,25 @@ ok(v.queued === 0, 'played adds are not upcoming');
 v = queueView(q([song('dup'), song('now'), song('dup')], 1));
 ok(v.rows.map((r) => r.key).join() === 'dup:0,now:0,dup:1', 'each copy keeps its own key');
 
+// Podcast up next (stream: podcast-upnext): the show's next episode carries a reason and starts
+// the block, autoplay's predictions follow it, and the block is "Next up", not "Autoplay". A song
+// queue is unchanged.
+const ep = (id: string, extra: Partial<SongItem> = {}) => song(id, { is_episode: true, ...extra });
+v = queueView(
+	q(
+		[
+			ep('before'),
+			ep('now'),
+			ep('next', { reason: 'From S' }),
+			ep('f1', { reason: 'Because you follow F', autoplay: true })
+		],
+		1
+	)
+);
+ok(ids(v.rows) === 'before,now', 'history and the playing episode');
+ok(ids(v.autoplay) === 'next,f1' && v.upNext, 'one Next up block');
+ok(!queueView(q([song('now'), auto('r1')], 0)).upNext, 'songs keep Autoplay');
+
 // The leak #2ce233c fixed: a key must not change when the queue advances, or Svelte rebuilds rows.
 const long = [song('a'), song('b'), song('c')];
 ok(

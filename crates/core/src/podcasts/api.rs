@@ -121,6 +121,7 @@ pub async fn podcast_show(state: &Arc<AppState>, id: String, sort: Option<Sort>)
             let (show, eps, etag, lm) = super::rss::fetch_show(&id).await?;
             let conn = st.db.podcasts_conn();
             store::upsert_episodes(&conn, &eps).map_err(|e| e.to_string())?;
+            store::set_serial(&conn, &id, show.serial); // stream: podcast-upnext
             let _ = store::set_feed_state(
                 &conn,
                 &id,

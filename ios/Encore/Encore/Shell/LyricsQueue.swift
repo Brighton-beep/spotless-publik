@@ -172,10 +172,22 @@ struct LyricsFullView: View {
             }
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.08),
                                          .init(color: .black, location: 0.9), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
-            // Mini scrubber (2 pt) with times, then the 48 pt white play/pause circle.
+            // Mini scrubber (2 pt) with times, then previous / the 48 pt white play-pause circle / next.
             VStack(spacing: Space.s) {
                 Scrubber(trackHeight: 2)
-                PlayCircleButton(playing: !app.player.paused, size: 48, color: .white) { app.player.togglePause() }
+                HStack(spacing: Space.xxl) {
+                    Button { app.player.skipPrevious() } label: {
+                        Icon(name: "skip-back", fill: true, size: 28).frame(width: 48, height: 48)
+                    }
+                    .accessibilityLabel("Previous")
+                    .accessibilityIdentifier("lyrics-prev")
+                    PlayCircleButton(playing: !app.player.paused, size: 48, color: .white) { app.player.togglePause() }
+                    Button { app.player.skipNext() } label: {
+                        Icon(name: "skip-forward", fill: true, size: 28).frame(width: 48, height: 48)
+                    }
+                    .accessibilityLabel("Next")
+                    .accessibilityIdentifier("lyrics-next")
+                }
             }
             .padding(.horizontal, Space.xl)
             .padding(.bottom, Space.l + insets.bottom)
@@ -272,7 +284,10 @@ struct QueueView: View {
         // in under "Next: Autoplay" (a single pick has only the latter). Once Autoplay starts, the
         // rest goes with it, as on the desktop (`queue.ts`).
         let notQueued = up.filter { !$0.song.isQueued }
-        let autoStart = notQueued.firstIndex { $0.song.autoplay == true } ?? notQueued.count
+        // Podcast up next (the core's predictions, each with its reason): one "Next up" block from
+        // the show's own next episode on, as on the desktop (`queue.ts`).
+        let autoStart = notQueued.firstIndex { $0.song.autoplay == true || $0.song.reason != nil } ?? notQueued.count
+        let upNext = notQueued[autoStart...].first?.song.isEpisode == true
         let rest = Array(notQueued[..<autoStart])
         let auto = Array(notQueued[autoStart...])
         ZStack(alignment: .bottom) {
@@ -329,9 +344,11 @@ struct QueueView: View {
                                 .onMove { from, to in move(auto, from, to) }
                         } header: {
                             VStack(alignment: .leading, spacing: 2) {
-                                sectionTitle("Next: Autoplay")
-                                Text("Similar songs keep playing when your music ends.")
-                                    .font(Typo.font(13)).foregroundStyle(Palette.subdued)
+                                sectionTitle(upNext ? "Next up" : "Next: Autoplay")
+                                if !upNext {
+                                    Text("Similar songs keep playing when your music ends.")
+                                        .font(Typo.font(13)).foregroundStyle(Palette.subdued)
+                                }
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityIdentifier("queue-autoplay")
@@ -467,7 +484,7 @@ struct QueueView: View {
                     // Smart Shuffle suggestion: accent sparkle before the artist (Spotify).
                     if isSuggestion(s) { Icon(name: "sparkle", fill: true, size: 12).foregroundStyle(Palette.accent) }
                     if s.explicit == true { ExplicitBadge() }
-                    Text(s.artists).font(Typo.rowSubtitle).foregroundStyle(Palette.subdued).lineLimit(1)
+                    Text(s.reason ?? s.artists).font(Typo.rowSubtitle).foregroundStyle(Palette.subdued).lineLimit(1)
                 }
             }
             Spacer(minLength: 0)

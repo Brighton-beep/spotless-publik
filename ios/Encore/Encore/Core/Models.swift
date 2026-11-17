@@ -37,6 +37,9 @@ struct SongItem: Codable, Hashable, Identifiable {
     var counterpartThumbnail: String?
     /// The row's id inside a YouTube playlist (`playlistSetVideoId`): what removing or moving it takes.
     var setVideoId: String?
+    /// Why the core put this episode next (podcast up next: "From …", "Because you follow …",
+    /// "Popular in …"). The queue sheet shows it in place of the show name.
+    var reason: String?
 
     var id: String { videoId }
 
@@ -46,6 +49,7 @@ struct SongItem: Codable, Hashable, Identifiable {
         case queued, queuedEnd = "queued_end", queuedFrom = "queued_from", autoplay, unavailable
         case explicit, isVideo = "is_video", isEpisode = "is_episode"
         case counterpart, counterpartThumbnail = "counterpart_thumbnail", setVideoId = "set_video_id"
+        case reason
     }
 
     init(videoId: String, title: String, artists: String, artistId: String? = nil, album: String? = nil,

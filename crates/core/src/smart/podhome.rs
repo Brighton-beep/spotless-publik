@@ -179,7 +179,7 @@ fn seeds(db: &Db) -> Vec<String> {
 }
 
 /// A show's Apple genre id, from a directory search for its title (cached a day).
-async fn genre_of(db: &Db, title: &str) -> Option<String> {
+pub(crate) async fn genre_of(db: &Db, title: &str) -> Option<String> {
     let url = format!(
         "https://itunes.apple.com/search?media=podcast&entity=podcast&limit=5&country={}&term={}",
         itunes::country(db),
@@ -239,7 +239,7 @@ pub fn parse_chart(v: &Value) -> Vec<ChartEntry> {
 
 /// Apple's top shows, overall (`genre` None: the marketing-tools feed, or the iTunes RSS feed when
 /// that one is down) or in one genre.
-async fn chart(db: &Db, genre: Option<&str>) -> Vec<ChartEntry> {
+pub(crate) async fn chart(db: &Db, genre: Option<&str>) -> Vec<ChartEntry> {
     let cc = itunes::country(db).to_lowercase();
     let get = |url: String| async move { itunes::get_json(db, &url, &[]).await.map(|v| parse_chart(&v)).unwrap_or_default() };
     match genre {
@@ -275,7 +275,7 @@ pub fn parse_lookup(v: &Value) -> (HashMap<String, Show>, HashMap<String, Episod
     (shows, eps)
 }
 
-async fn lookup(db: &Db, ids: &[String]) -> (HashMap<String, Show>, HashMap<String, Episode>) {
+pub(crate) async fn lookup(db: &Db, ids: &[String]) -> (HashMap<String, Show>, HashMap<String, Episode>) {
     if ids.is_empty() {
         return Default::default();
     }

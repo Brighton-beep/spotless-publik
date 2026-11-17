@@ -293,6 +293,7 @@
 					removeLabel={t('player.remove_from_queue')}
 					playlistId={playback.queue.sourceId}
 					queueIndex={i}
+					subtitle={i > playback.queue.currentIndex ? item.reason : undefined}
 				/>
 			</div>
 		{/each}
@@ -395,7 +396,7 @@
 					out:leave={motion.rows}
 				>
 					<HugeiconsIcon icon={InfinityIcon} class="h-3.5 w-3.5" />
-					<span class="text-xs font-medium">{t('player.autoplay')}</span>
+					<span class="text-xs font-medium">{view.upNext ? t('player.next_up') : t('player.autoplay')}</span>
 				</div>
 				{@render rows(view.autoplay, wins[1])}
 			{/if}
