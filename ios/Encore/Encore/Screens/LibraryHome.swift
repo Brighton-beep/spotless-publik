@@ -543,14 +543,22 @@ struct HomeView: View {
 
     static let chips = ["All", "Music", "Podcasts", "Audiobooks"] // Audiobooks: stream audiobooks
 
-    /// What Home shows: offline, only what's on the phone; under "Music", no podcasts.
+    /// What Home shows (offline the core sends only what's on the phone); under "Music", no podcasts.
     private var shelves: [Shelf] {
         if chip == "Podcasts" { return app.home.podcastShelves }
         if chip == "Audiobooks" { return app.home.audiobookShelves }
-        var s = app.home.shelves
-        if app.downloads.offline { s = HomeStore.offlineShelves(s, downloads: app.downloads.snapshot.collections, done: app.downloads.done) }
-        if chip == "Music" { s = HomeStore.musicOnly(s) }
-        return s
+        return chip == "Music" ? HomeStore.musicOnly(app.home.shelves) : app.home.shelves
+    }
+
+    /// The desktop's Home states (`+page.svelte`): skeletons until the first answer, the error
+    /// with Reload when it failed with nothing to show, "Nothing here yet" when it's empty.
+    private enum Phase { case loading, failed, empty, shelves }
+    /// `mixes`: the stored Made for you shelf counts as something to show.
+    private func phase(_ shelves: [Shelf], mixes: Bool) -> Phase {
+        guard chip == "All" || chip == "Music" else { return .shelves }
+        if shelves.isEmpty && app.home.failed { return .failed }
+        if shelves.isEmpty && !app.home.loaded { return .loading }
+        return mixes || shelves.contains { $0.layout == .notice || !$0.items.isEmpty } ? .shelves : .empty
     }
 
     var body: some View {
@@ -562,15 +570,23 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: Space.m) {
                         chipRow
                             .id("top")
+                        if let n = shelves.first(where: { $0.layout == .notice }) { notice(n) }
                         if let s = shelves.first(where: { $0.layout == .shortcuts }) { shortcuts(s.items) }
                     }
-                    if offline && chip != "Podcasts" && chip != "Audiobooks" && !shelves.contains(where: { $0.id == "downloaded" }) { offlineEmpty }
                     // smart2: Made for you right after Recently played (first when there is none yet).
                     // The stored mixes replace the core's own "made_for_you" shelf, never both.
-                    let hasMfy = !app.settings.madeForYou.isEmpty && !offline
-                    let feed = shelves.filter { $0.layout != .shortcuts && !(hasMfy && $0.id == "made_for_you") }
+                    let mixes = !app.settings.madeForYou.isEmpty && !offline
+                    let ph = phase(shelves, mixes: mixes)
+                    switch ph {
+                    case .loading: skeletons
+                    case .failed: failedState
+                    case .empty: emptyState
+                    case .shelves: EmptyView()
+                    }
+                    let hasMfy = mixes && ph == .shelves
+                    let feed = shelves.filter { $0.layout != .shortcuts && $0.layout != .notice && !(hasMfy && $0.id == "made_for_you") }
                     if hasMfy && chip != "Podcasts" && chip != "Audiobooks" && !feed.contains(where: { $0.id == "recently_played" }) { MadeForYouShelf() }
-                    ForEach(feed) { shelf in
+                    ForEach(Array(feed.enumerated()), id: \.element.id) { idx, shelf in
                         VStack(alignment: .leading, spacing: Space.m) {
                             // Every shelf opens as a grid (Spotify's "Show all"); moods are tiles already.
                             if shelf.layout == .moods || shelf.items.count < 3 {
@@ -587,6 +603,8 @@ struct HomeView: View {
                         .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("home-shelf")
                         if hasMfy && shelf.id == "recently_played" { MadeForYouShelf() }
+                        // The desktop's "Your shows": on All, after the second shelf (Made for you counts).
+                        if idx == (hasMfy ? 0 : 1) && chip == "All" && !app.podcasts.follows.isEmpty { yourShows }
                     }
                     Color.clear.frame(height: 1).id("end")
                 }
@@ -663,13 +681,98 @@ struct HomeView: View {
         withAnimation(Motion.quick) { chip = next }
     }
 
-    private var offlineEmpty: some View {
+    /// Offline Home's header: the core's "You're offline" notice (`offline_home`).
+    private func notice(_ s: Shelf) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("You're offline").font(Typo.font(16, .bold))
-            Text("Download music to listen without a connection. It shows up here.").font(Typo.meta).foregroundStyle(Palette.subdued)
+            Text(s.title).font(Typo.font(16, .bold))
+            if let sub = s.subtitle { Text(sub).font(Typo.meta).foregroundStyle(Palette.subdued) }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Space.gutter)
-        .accessibilityIdentifier("home-offline-empty")
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home-offline")
+    }
+
+    /// While the first `smart_home` answer is on its way: grey shortcut tiles and card shelves.
+    private var skeletons: some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: Space.s), GridItem(.flexible(), spacing: Space.s)], spacing: Space.s) {
+                ForEach(0..<8, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: Radius.s).fill(Palette.tinted).frame(height: Metrics.shortcutHeight)
+                }
+            }
+            .padding(.horizontal, Space.gutter)
+            ForEach(0..<3, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: Space.m) {
+                    RoundedRectangle(cornerRadius: Radius.s).fill(Palette.tinted).frame(width: 200, height: 20)
+                    HStack(spacing: Space.l) {
+                        ForEach(0..<2, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: Radius.s).fill(Palette.tinted).frame(width: Metrics.card, height: Metrics.card)
+                        }
+                    }
+                }
+                .padding(.horizontal, Space.gutter)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipped()
+        .accessibilityHidden(true)
+        .accessibilityIdentifier("home-loading")
+    }
+
+    /// The desktop's ErrorState: "Something went wrong", "Try reloading the page.", Reload.
+    private var failedState: some View {
+        VStack(spacing: Space.m) {
+            Icon(name: "warning-circle", size: 56).foregroundStyle(Palette.subdued)
+            Text("Something went wrong").font(Typo.font(24, .bold))
+            Text("Try reloading the page.").font(Typo.font(16)).foregroundStyle(Palette.subdued)
+            Button {
+                app.home.failed = false
+                Task { await load() }
+            } label: {
+                Text("Reload").font(Typo.button).foregroundStyle(.black)
+                    .padding(.horizontal, 32).frame(height: 48).background(Capsule().fill(.white))
+            }
+            .buttonStyle(PressScale())
+            .accessibilityIdentifier("home-retry")
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 64)
+        .padding(.horizontal, Space.gutter)
+        .accessibilityIdentifier("home-error")
+    }
+
+    /// Nothing played yet and nothing from YouTube: the desktop's "Nothing here yet".
+    private var emptyState: some View {
+        VStack(spacing: Space.l) {
+            Text("Nothing here yet").font(Typo.font(20, .bold))
+            Text("Play something and Home fills up with your mixes, recents and new releases.")
+                .font(Typo.font(16)).foregroundStyle(Palette.subdued)
+            Button { app.router.select(.search) } label: {
+                Text("Browse all").font(Typo.button).foregroundStyle(.black)
+                    .padding(.horizontal, 32).frame(height: 48).background(Capsule().fill(.white))
+            }
+            .buttonStyle(PressScale())
+            .accessibilityIdentifier("home-browse-all")
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 64)
+        .padding(.horizontal, Space.gutter)
+        .accessibilityIdentifier("home-empty")
+    }
+
+    /// The shows you follow (the desktop's "Your shows" shelf on All).
+    private var yourShows: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            SectionTitle(title: "Your shows")
+            CardShelf(items: app.podcasts.follows.map {
+                BrowseItem(kind: .podcast, id: $0.id, title: $0.title, subtitle: $0.author, thumbnail: $0.thumbnail)
+            })
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home-your-shows")
     }
 
     private func load() async {

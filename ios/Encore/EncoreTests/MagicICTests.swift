@@ -104,11 +104,13 @@ final class MagicICTests: XCTestCase {
         ]
         let dl = [DownloadCollectionStatus(id: "B", kind: "playlist", title: "B", total: 3, done: 3, failed: 0, bytes: 0, addedAt: 1),
                   DownloadCollectionStatus(id: likedPlaylistId, kind: "liked", title: "Liked Songs", total: 9, done: 9, failed: 0, bytes: 0, addedAt: 2)]
-        let off = HomeStore.offlineShelves(shelves, downloads: dl, done: ["s2"])
-        XCTAssertEqual(off.map(\.id), ["shortcuts", "downloaded", "recently_played"])
-        XCTAssertEqual(off[0].items.map(\.id), ["liked", "B"])
-        XCTAssertEqual(off[1].items.map(\.id), [likedPlaylistId, "B"], "newest download first")
-        XCTAssertEqual(off[2].items.map(\.id), ["s2"])
+        // The mock stands in for the core's `offline_shelves` (crates/core/src/smart/home.rs).
+        let off = MockCoreClient.offlineShelves(shelves, downloads: dl, done: ["s2"])
+        XCTAssertEqual(off.map(\.id), ["offline", "shortcuts", "downloaded", "recently_played"])
+        XCTAssertEqual(off[0].layout, .notice)
+        XCTAssertEqual(off[1].items.map(\.id), ["liked", "B"])
+        XCTAssertEqual(off[2].items.map(\.id), ["liked", "B"], "newest download first")
+        XCTAssertEqual(off[3].items.map(\.id), ["s2"])
     }
 
     func testGoingOfflineOpensLibraryOnDownloadedAndBack() {

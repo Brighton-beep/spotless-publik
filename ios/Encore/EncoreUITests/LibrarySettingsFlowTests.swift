@@ -33,7 +33,7 @@ final class LibrarySettingsFlowTests: XCTestCase {
         // cookies from WKHTTPCookieStore and signs in through the core, then closes the sheet.
         XCTAssertTrue(toastShows("Signed in as Test Listener", timeout: 12))
         XCTAssertTrue(el("youtube-account").waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts["Signed in with YouTube"].exists)
+        XCTAssertTrue(app.staticTexts["Signed in to YouTube Music"].exists)
 
         el("youtube-signout").tap()
         let confirm = app.buttons.matching(NSPredicate(format: "label == 'Sign out' AND identifier != 'youtube-signout'")).firstMatch

@@ -47,7 +47,9 @@ extension MockCoreClient {
 
     func audiobookHome() async throws -> [Shelf] {
         let card = { (b: Audiobook) in ShelfItem(kind: "audiobook", id: b.id, title: b.title, subtitle: b.author, thumbnail: b.thumbnail, explicit: false) }
-        let genres = [("mystery", "Mystery", "#8c1932"), ("romance", "Romance", "#e8115b"), ("adventure", "Adventure", "#27856a"), ("children", "Kids", "#e13300")]
+        // The core's genre tiles (audiobooks/ia.rs): the shared palette in order.
+        let p = BrowseTiles.palette
+        let genres = [("mystery", "Mystery", p[0]), ("romance", "Romance", p[1]), ("adventure", "Adventure", p[2]), ("children", "Kids", p[6])]
         var out: [Shelf] = []
         let saved = try await audiobookSaved()
         if !saved.isEmpty { out.append(Shelf(id: "ab_saved", title: "Your audiobooks", layout: .cards, source: "local", items: saved.map(card))) }

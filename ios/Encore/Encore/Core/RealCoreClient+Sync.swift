@@ -19,6 +19,9 @@ extension RealCoreClient {
     func recentTracks(limit: Int?) async throws -> [RecentTrack] {
         try await call("lib_recent_tracks", ["limit": limit], as: Lossy<RecentTrack>.self).items
     }
+    func recentPlayContexts(limit: Int?) async throws -> [RecentPlayContext] {
+        try await call("recent_play_contexts", ["limit": limit], as: Lossy<RecentPlayContext>.self).items
+    }
     func listeningStats(since: Int64) async throws -> ListeningStats { try await call("listening_stats", ["since": Int(since)]) }
     func topArtists(limit: Int) async throws -> [TopArtist] { try await call("top_artists", ["limit": limit]) }
     func clearListeningHistory() async throws { _ = try await call("clear_listening_history") }

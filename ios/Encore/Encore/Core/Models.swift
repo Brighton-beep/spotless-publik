@@ -176,7 +176,8 @@ struct ShelfItem: Codable, Hashable, Identifiable {
 }
 
 struct Shelf: Codable, Hashable, Identifiable {
-    enum Layout: String, Codable { case shortcuts, cards, songs, moods }
+    /// `notice`: offline Home's "You're offline" header (title + subtitle, no items).
+    enum Layout: String, Codable { case shortcuts, cards, songs, moods, notice }
     var id: String
     var title: String
     var subtitle: String?

@@ -196,6 +196,7 @@ final class MockCoreClient: CoreClient, @unchecked Sendable {
                                  items: cards.prefix(8).map { $0.id == likedPlaylistId
                                      ? ShelfItem(kind: "liked", id: likedPlaylistId, title: "Liked Songs", explicit: false) : shelfItem($0) }))
             shelves.append(Shelf(id: "recently_played", title: "Recently played", layout: .cards, source: "local", items: cards.map(shelfItem)))
+            if fs.dlNetwork.offline { return offlineHomeLocked(shelves) }
             if mockLiveMixes { shelves.append(mockDailyMixShelfLocked()) }
             let home: HomePage? = get("home")
             for (i, s) in (home?.sections ?? []).enumerated() {

@@ -45,12 +45,12 @@ private struct AccountSettings: View {
             ProfileAvatar(size: 48)
             VStack(alignment: .leading, spacing: 3) {
                 Text(app.localUser).font(Typo.font(16, .bold))
-                Text(store.signedIn ? "Signed in with YouTube" : "Local account, no sign-in needed")
+                Text(store.signedIn ? "Signed in to YouTube Music" : "Local profile")
                     .font(Typo.font(13)).foregroundStyle(Palette.subdued)
             }
         }
         .padding(.horizontal, Space.gutter).padding(.vertical, Space.s)
-        SettingsNote(text: "Spotless keeps your library, likes and listening history on this iPhone. There is no Spotless account.")
+        SettingsNote(text: "Spotless works without an account. Your library, likes and history are stored on this iPhone.")
         SettingsHeader(title: "YouTube account")
         if store.signedIn {
             HStack(spacing: Space.m) {
@@ -299,9 +299,9 @@ private struct QualitySettings: View {
 
     @ViewBuilder private func list(_ key: String) -> some View {
         let saver = app.settings.bool(SettingKey.dataSaver)
-        let cur = saver ? "low" : StreamQuality.normalized(app.settings.values[key], default: "auto")
+        let cur = saver ? "low" : StreamQuality.normalized(app.settings.values[key])
         ForEach(StreamQuality.choices, id: \.id) { c in
-            SettingsRadioRow(title: c.title, subtitle: c.subtitle, selected: cur == c.id) {
+            SettingsRadioRow(title: c.title, selected: cur == c.id) {
                 app.settings.set(key, c.id)
                 if saver && c.id != "low" { app.settings.set(SettingKey.dataSaver, false) }
                 StreamQuality.shared.apply()

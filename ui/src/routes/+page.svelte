@@ -80,6 +80,8 @@
 	let localSeq = 0;
 	/** The local shelves only (no network, a few ms): the grid, recently played, jump back in. */
 	async function refreshLocal() {
+		// Offline Home is the core's (downloads only, `offline_home`): rebuild it whole.
+		if (notice) return void load(true);
 		const seq = ++localSeq;
 		try {
 			const local = titled(await api.smartHomeLocal());
@@ -162,6 +164,8 @@
 	// ── what each filter shows ──
 	const isPodcastItem = (i: ShelfItem) => i.kind === 'podcast' || i.kind === 'episode';
 	const shortcuts = $derived(shelves?.find((s) => s.layout === 'shortcuts')?.items.slice(0, 8) ?? []);
+	/** Offline: the core's "You're offline" notice heads Home. */
+	const notice = $derived(shelves?.find((s) => s.layout === 'notice'));
 	const feed = $derived.by(() => {
 		const list = (shelves ?? []).filter((s) => s.layout !== 'shortcuts' && s.items.length);
 		if (filter === 'music')
@@ -273,6 +277,12 @@
 		{:else if error}
 			<ErrorState message="Try reloading the page." onRetry={() => load(true)} />
 		{:else}
+			{#if notice}
+				<div class="flex flex-col gap-1" data-testid="home-offline">
+					<h2 class="font-title text-base font-bold text-white">{notice.title}</h2>
+					{#if notice.subtitle}<p class="text-sm text-text-subdued">{notice.subtitle}</p>{/if}
+				</div>
+			{/if}
 			<!-- ── 3. shortcuts ── -->
 			{#if shortcuts.length && filter === 'all'}
 				<div class="shortcuts mb-[19px] grid gap-2" {@attach roving(TILE_KEYS)}>
@@ -319,7 +329,7 @@
 				{/if}
 			{/each}
 
-			{#if !feed.length && !shortcuts.length}
+			{#if !feed.length && !shortcuts.length && !notice}
 				<div class="flex flex-col items-center gap-4 py-16 text-center">
 					<h2 class="font-title text-xl font-bold text-white">Nothing here yet</h2>
 					<p class="max-w-[400px] text-base text-text-subdued">

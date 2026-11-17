@@ -952,6 +952,10 @@ export const importReadFile = async (file: File) =>
 /** `lists` are indices into the last preview. */
 export const importStart = (lists: number[]) => invoke<ImportSnapshot>('import_start', { lists });
 export const importStatus = () => invoke<ImportSnapshot | null>('import_status');
+/** First run: offer the import? Empty library and never answered (core `library::import_offer`). */
+export const importOffer = () => invoke<boolean>('import_offer');
+/** The first-run import offer was answered: the core's `import_onboarding_done`. */
+export const importOfferDone = () => invoke<void>('import_offer_done');
 export const importRows = (tier: ImportTier) => invoke<ImportRow[]>('import_rows', { tier });
 /** `null` leaves the track out. A song picked here is remembered for every later import. */
 export const importPick = (key: string, song: SongItem | null) =>
@@ -1178,11 +1182,11 @@ export interface ShelfItem {
 }
 export interface Shelf {
 	/** shortcuts | recently_played | top_mixes | made_for_you | more_like:<UC…> | jump_back_in |
-	 *  new_releases | yt:<kind> | moods */
+	 *  new_releases | yt:<kind> | moods; offline: offline (a `notice`, no items) | downloaded */
 	id: string;
 	title: string;
 	subtitle?: string;
-	layout: 'shortcuts' | 'cards' | 'songs' | 'moods';
+	layout: 'shortcuts' | 'cards' | 'songs' | 'moods' | 'notice';
 	source: 'local' | 'youtube' | 'apple';
 	items: ShelfItem[];
 }

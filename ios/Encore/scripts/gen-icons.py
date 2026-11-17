@@ -16,6 +16,7 @@ ICONS += ["MonitorPlay", "ArrowsInSimple"]  # Now Playing "Switch to video", ful
 # Settings pages (ios-screens2-b)
 ICONS += ["Lock", "SlidersHorizontal", "HardDrives", "CellSignalFull", "WifiHigh", "PlayCircle", "Moon",
           "Equalizer", "DeviceMobile", "Eye", "Waveform", "UserCircle", "DownloadSimple", "FileText", "Code"]
+ICONS += ["WarningCircle"]  # Home error state (parity)
 
 src, dst = sys.argv[1], sys.argv[2]
 os.makedirs(dst, exist_ok=True)

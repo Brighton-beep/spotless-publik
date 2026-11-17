@@ -1,6 +1,7 @@
 // Stream ios-p2: Recents (Spotify iOS: profile menu › Recents) and your listening stats.
-// "Recently played" is the local listening history (`lib_recent_tracks`), newest first under day
-// headers; "Your top" is the last four weeks (`listening_stats`): time listened, plays, top artists
+// "Recently played" is the desktop's page: the contexts you played from as a card grid
+// (`recent_play_contexts`), then the local listening history (`lib_recent_tracks`), newest first
+// under day headers; "Your top" is the last four weeks (`listening_stats`): time listened, plays, top artists
 // and top songs (Spotify's profile "Top artists / tracks this month"). Desktop: `/history` and
 // `/stats` (iOS: StatsView, linked from "Your top"). Nothing here leaves the phone; Settings ›
 // Privacy clears it.
@@ -11,6 +12,9 @@ struct HistoryView: View {
     enum Tab: String, CaseIterable { case recents = "Recently played", top = "Your top" }
     @State var tab: Tab = .recents
     @State private var rows: [RecentTrack]?
+    /// The albums, playlists and artists you played from (the desktop's card grid on top).
+    @State private var contexts: [RecentPlayContext] = []
+    @State private var showAllContexts = false
     @State private var stats: ListeningStats?
     @State private var failed = false
 
@@ -50,9 +54,18 @@ struct HistoryView: View {
 
     @ViewBuilder private var recents: some View {
         if let rows {
-            if rows.isEmpty {
-                empty("Songs you play show up here.")
+            if rows.isEmpty && contexts.isEmpty {
+                EntityEmptyState(icon: "clock-counter-clockwise", title: "Nothing played yet",
+                                 line: "Albums, playlists, artists and songs you play will show up here.",
+                                 action: "Find something to play") { app.router.select(.search) }
+                    .accessibilityIdentifier("history-empty")
             } else {
+                if !contexts.isEmpty { contextGrid }
+                if !rows.isEmpty {
+                    Text("Songs").font(Typo.font(20, .bold))
+                        .padding(.horizontal, Space.gutter).padding(.top, Space.xl)
+                        .accessibilityAddTraits(.isHeader)
+                }
                 let songs = rows.map(\.song)
                 ForEach(Self.days(rows), id: \.title) { day in
                     Text(day.title).font(Typo.font(16, .bold))
@@ -65,6 +78,72 @@ struct HistoryView: View {
             }
         } else {
             EntityLoadState(failed: failed) { Task { await load() } }
+        }
+    }
+
+    /// Two columns of the contexts you played from; six until "Show all" (the desktop's two rows).
+    private var contextGrid: some View {
+        let shown = showAllContexts ? contexts : Array(contexts.prefix(6))
+        return VStack(alignment: .leading, spacing: Space.m) {
+            GeometryReader { g in
+                let w = floor((g.size.width - Space.gutter * 2 - Space.l) / 2)
+                LazyVGrid(columns: [GridItem(.fixed(w), spacing: Space.l, alignment: .top), GridItem(.fixed(w), alignment: .top)],
+                          alignment: .leading, spacing: Space.l) {
+                    ForEach(shown, id: \.self) { c in
+                        Button { open(c) } label: {
+                            MediaCard(title: c.title, subtitle: Self.subtitle(c), thumbnail: c.thumbnail, circle: c.kind == "artist",
+                                      size: w, liked: c.kind == "liked")
+                        }
+                        .buttonStyle(PressScale())
+                        .accessibilityIdentifier("history-context")
+                    }
+                }
+                .padding(.horizontal, Space.gutter)
+            }
+            .frame(height: Self.gridHeight(count: shown.count))
+            if contexts.count > 6 && !showAllContexts {
+                Button("Show all") { withAnimation(Motion.quick) { showAllContexts = true } }
+                    .font(Typo.metaBold).foregroundStyle(Palette.subdued)
+                    .padding(.horizontal, Space.gutter)
+                    .accessibilityIdentifier("history-contexts-all")
+            }
+        }
+    }
+
+    /// The grid's height: cards are about half the screen wide plus two lines of text.
+    private static func gridHeight(count: Int) -> CGFloat {
+        let w = floor((UIScreen.main.bounds.width - Space.gutter * 2 - Space.l) / 2)
+        let rows = CGFloat((count + 1) / 2)
+        return rows * (w + 56) + max(0, rows - 1) * Space.l
+    }
+
+    /// The card's second line (the desktop's `subtitleFor`).
+    static func subtitle(_ c: RecentPlayContext) -> String {
+        switch c.kind {
+        case "liked": return "Playlist • You"
+        case "artist": return "Artist"
+        case "podcast": return "Podcast" + (c.subtitle.map { " • \($0)" } ?? "")
+        case "playlist":
+            let creator = creatorOf(c.subtitle)
+            return creator.isEmpty ? "Playlist" : "Playlist • \(creator)"
+        default:
+            if let s = c.subtitle, !s.isEmpty { return s }
+            return c.kind == "album" ? "Album" : c.kind == "radio" || c.kind == "mix" ? "Radio" : "Playlist"
+        }
+    }
+
+    /// A context's page; radios and mixes open their radio page.
+    private func open(_ c: RecentPlayContext) {
+        switch c.kind {
+        case "liked": app.router.push(.liked)
+        case "album": app.router.push(.album(c.id))
+        case "artist": app.router.push(.artist(c.id))
+        case "podcast": app.router.push(.show(c.id))
+        case "audiobook": app.router.push(.audiobook(c.id))
+        case "daily_mix": app.router.push(.dailyMix(c.id, c.title, c.subtitle, c.thumbnail))
+        case "radio": app.router.push(.radio(c.params ?? "song", c.id, c.title))
+        case "mix": app.router.push(.radio("artist", c.id, c.title))
+        default: app.router.push(c.id == "EPISODES" ? .yourEpisodes : c.id == likedPlaylistId ? .liked : .playlist(c.id))
         }
     }
 
@@ -192,7 +271,9 @@ struct HistoryView: View {
         failed = false
         do {
             async let r = app.core.recentTracks(limit: 200)
+            async let c = app.core.recentPlayContexts(limit: 50)
             async let s = app.core.listeningStats(since: Int64(Date().timeIntervalSince1970) - 28 * 86_400)
+            contexts = (try? await c) ?? contexts
             rows = try await r
             stats = try await s
         } catch {

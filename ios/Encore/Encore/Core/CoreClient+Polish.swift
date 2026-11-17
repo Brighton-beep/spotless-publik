@@ -15,8 +15,15 @@ extension RealCoreClient {
     func downloadedSongs(collectionId: String) async throws -> [SongItem] {
         try await call("downloads_collection_songs", ["id": collectionId])
     }
-    /// Matching is done (phase `review`): write the lists, likes, saves and history here.
-    func importCreate() async throws { _ = try await call("import_create", ["options": ["local": true]]) }
+    /// Matching is done (phase `review`): write the lists, likes, saves and history, here or on
+    /// the YouTube account (the desktop's ImportDialog `create`).
+    func importCreate(names: [Int: String], local: Bool) async throws {
+        let named = Dictionary(uniqueKeysWithValues: names.map { (String($0.key), $0.value) })
+        _ = try await call("import_create", ["options": ["names": named, "local": local]])
+    }
+    /// First run: offer the import? The core's rule (`library::import_offer`), shared with the Mac.
+    func importOffer() async throws -> Bool { try await call("import_offer") }
+    func importOfferDone() async throws { _ = try await call("import_offer_done") }
 }
 
 extension MockCoreClient {

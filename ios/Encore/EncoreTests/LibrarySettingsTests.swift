@@ -111,15 +111,17 @@ final class LibrarySettingsTests: XCTestCase {
     // MARK: streaming quality
 
     func testCoreQualityResolvesWifiCellularAndDataSaver() {
-        XCTAssertEqual(StreamQuality.coreQuality(cellular: false, wifi: "auto", cell: "auto", dataSaver: false), "HIGH")
+        // The desktop's five choices, the same values in the core's `quality`.
+        XCTAssertEqual(StreamQuality.choices.map(\.title), ["Automatic", "Low", "Normal", "High", "Very high"])
+        XCTAssertEqual(StreamQuality.coreQuality(cellular: false, wifi: "auto", cell: "auto", dataSaver: false), "AUTO")
         XCTAssertEqual(StreamQuality.coreQuality(cellular: true, wifi: "auto", cell: "auto", dataSaver: false), "LOW")
         XCTAssertEqual(StreamQuality.coreQuality(cellular: true, wifi: "low", cell: "high", dataSaver: false), "HIGH")
         XCTAssertEqual(StreamQuality.coreQuality(cellular: false, wifi: "low", cell: "high", dataSaver: false), "LOW")
         XCTAssertEqual(StreamQuality.coreQuality(cellular: false, wifi: "high", cell: "high", dataSaver: true), "LOW")
-        // Values older builds stored.
-        XCTAssertEqual(StreamQuality.coreQuality(cellular: false, wifi: "very_high", cell: "normal", dataSaver: false), "HIGH")
-        XCTAssertEqual(StreamQuality.coreQuality(cellular: true, wifi: "very_high", cell: "normal", dataSaver: false), "LOW")
-        XCTAssertEqual(StreamQuality.normalized("bogus", default: "auto"), "auto")
+        XCTAssertEqual(StreamQuality.coreQuality(cellular: false, wifi: "very_high", cell: "normal", dataSaver: false), "VERY_HIGH")
+        XCTAssertEqual(StreamQuality.coreQuality(cellular: true, wifi: "very_high", cell: "normal", dataSaver: false), "NORMAL")
+        XCTAssertEqual(StreamQuality.normalized("bogus"), "auto")
+        XCTAssertEqual(StreamQuality.normalized(nil), "auto")
     }
 
     func testQualityChoicesReachTheCoreSetting() async throws {

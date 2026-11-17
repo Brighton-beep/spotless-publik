@@ -75,8 +75,10 @@ struct SearchView: View {
     /// Start browsing: the desktop's fixed tiles (Spotify iOS: Music · Podcasts · … ; Charts stands
     /// in for Music), then every genre and mood under Browse all.
     private var start: [(key: String, title: String, color: String, route: Route?)] {
-        [("charts", "Charts", "#8d67ab", .charts), ("podcasts", "Podcasts", "#006450", nil), ("audiobooks", "Audiobooks", "#b0461e", nil),
-         ("mfy", "Made for you", "#1e3264", .madeForYou), ("new", "New Releases", "#e8115b", .newReleases)]
+        let f = BrowseTiles.fixed
+        return [("charts", "Charts", f["charts"]!, .charts), ("podcasts", "Podcasts", f["podcasts"]!, nil),
+                ("audiobooks", "Audiobooks", f["audiobooks"]!, nil), ("mfy", "Made for you", f["made_for_you"]!, .madeForYou),
+                ("new", "New Releases", f["new_releases"]!, .newReleases)]
     }
 
     @ViewBuilder private var tiles: some View {
@@ -106,7 +108,7 @@ struct SearchView: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: Space.s), GridItem(.flexible(), spacing: Space.s)], spacing: Space.s) {
             ForEach(Array(items.enumerated()), id: \.element.params) { i, m in
                 Button { app.router.push(.mood(m.params, m.title)) } label: {
-                    // Spotify's saturated tile palette; YouTube's own mood colours are pastels.
+                    // Our tile palette (`BrowseTiles`); YouTube's own mood colours are pastels.
                     BrowseTile(title: m.title, color: BrowseTile.color(offset + i), art: art[m.params], tall: tall)
                 }
                 .buttonStyle(PressScale())
@@ -116,6 +118,18 @@ struct SearchView: View {
 
 }
 
+/// The Browse tile colours, the one list both apps use: exactly `crates/core/browse_tiles.json`
+/// (the Mac imports that file; a test checks these against it). Swap colours there and here.
+enum BrowseTiles {
+    /// The five fixed "Start browsing" tiles.
+    static let fixed: [String: String] = [
+        "charts": "#6a2fd8", "podcasts": "#0b7a75", "audiobooks": "#c2410c", "made_for_you": "#1f4fa8", "new_releases": "#d6246e",
+    ]
+    /// Genre and mood tiles, in order, cycling.
+    static let palette = ["#be123c", "#15803d", "#9d2bb0", "#0e6ba8", "#a16207", "#3f7d20",
+                          "#b0279f", "#d6246e", "#0b7a75", "#6a2fd8", "#1f4fa8", "#c2410c"]
+}
+
 /// Coloured tile with the title top-left and a rotated cover peeking out bottom-right.
 struct BrowseTile: View {
     let title: String
@@ -123,10 +137,8 @@ struct BrowseTile: View {
     var art: String?
     var tall = false
 
-    /// Spotify's saturated tile palette (YouTube's own mood colours are pastels): the n-th tile's colour.
-    static func color(_ n: Int) -> Color { Color(hex: palette[n % palette.count]) }
-    private static let palette = ["#dc148c", "#006450", "#8400e7", "#1e3264", "#e8115b", "#148a08", "#bc5900", "#503750",
-                                  "#477d95", "#e1118c", "#0d73ec", "#8d67ab", "#ba5d07", "#af2896", "#27856a", "#e91429"]
+    /// The n-th genre or mood tile's colour (`BrowseTiles.palette`, cycling).
+    static func color(_ n: Int) -> Color { Color(hex: BrowseTiles.palette[n % BrowseTiles.palette.count]) }
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: Radius.s + 2, style: .continuous).fill(color)

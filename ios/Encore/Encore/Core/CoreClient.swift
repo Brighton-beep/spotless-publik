@@ -160,7 +160,10 @@ protocol CoreClient: AnyObject, Sendable {
     func removeFromPlaylist(id: String, videoIds: [String]) async throws         // lib_playlist_remove_videos
     func song(videoId: String) async throws -> SongItem                          // song (shared links)
     func downloadedSongs(collectionId: String) async throws -> [SongItem]        // downloads_collection_songs
-    func importCreate() async throws                                             // import_create (on this phone)
+    /// `names`: a new name per list index; `local`: on this phone rather than the YouTube account.
+    func importCreate(names: [Int: String], local: Bool) async throws            // import_create
+    func importOffer() async throws -> Bool                                      // import_offer
+    func importOfferDone() async throws                                          // import_offer_done
     // Stream ios-import-review: the review step.
     func importRows(tier: String) async throws -> [ImportRow]                    // import_rows (matched | check | missing)
     func importPick(key: String, song: SongItem?) async throws -> ImportSnapshot // import_pick (nil leaves it out)
@@ -213,6 +216,7 @@ protocol CoreClient: AnyObject, Sendable {
     func enhanceKeep(playlistId: String, videoId: String) async throws -> EnhanceState     // enhance_keep
     func deletedPlaylists() async throws -> [DeletedPlaylist]                              // lib_deleted_playlists
     func recentTracks(limit: Int?) async throws -> [RecentTrack]                           // lib_recent_tracks
+    func recentPlayContexts(limit: Int?) async throws -> [RecentPlayContext]               // recent_play_contexts
     /// `since`: unix seconds (0 = all time).
     func listeningStats(since: Int64) async throws -> ListeningStats                       // listening_stats
     func topArtists(limit: Int) async throws -> [TopArtist]                                // top_artists

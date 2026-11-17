@@ -1864,6 +1864,26 @@ pub struct LibrarySnapshot {
     pub legacy_migrated: bool,
 }
 
+/// The first-run import offer's setting: "true" once it was answered (imported or "Not now").
+pub const IMPORT_ONBOARDING_DONE: &str = "import_onboarding_done";
+
+/// First run, both apps: offer the Spotify import only while the library is empty (no liked
+/// songs, playlists or saved items) and the offer was never answered.
+pub fn import_offer(conn: &Connection, answered: bool) -> bool {
+    !answered && liked_ids(conn).is_empty() && playlists(conn).is_empty() && saved(conn, None).is_empty()
+}
+
+/// [`import_offer`] against the settings table.
+pub fn import_offer_db(db: &crate::db::Db) -> bool {
+    let answered = db.get_setting(IMPORT_ONBOARDING_DONE).as_deref() == Some("true");
+    import_offer(&db.conn(), answered)
+}
+
+/// The offer was answered: never again.
+pub fn import_offer_done(db: &crate::db::Db) {
+    db.set_setting(IMPORT_ONBOARDING_DONE, "true");
+}
+
 pub fn snapshot(conn: &Connection, now: i64) -> LibrarySnapshot {
     LibrarySnapshot {
         liked_ids: liked_ids(conn),
@@ -2589,6 +2609,17 @@ mod tests {
         assert_eq!(snapshot(&c, 600).last_touched, t);
         forget_item(&c, "LOCALPLAYLIST:1");
         assert!(!last_touched(&c).contains_key("LOCALPLAYLIST:1"));
+    }
+
+    #[test]
+    fn import_offer_only_for_an_empty_unanswered_library() {
+        let d = db();
+        assert!(import_offer_db(&d), "first run, empty library");
+        import_offer_done(&d);
+        assert!(!import_offer_db(&d), "answered: never again");
+        let d = db();
+        like(&d.conn(), vec![song("a", "A")], 1).unwrap();
+        assert!(!import_offer_db(&d), "a library with a liked song isn't offered the import");
     }
 
     #[test]

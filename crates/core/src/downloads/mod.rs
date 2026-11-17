@@ -270,9 +270,13 @@ impl Manager {
         if after.offline_mode != before.offline_mode {
             self.state.host.offline_mode_changed(after.offline_mode); // stream: wave2
         }
-        if after.offline() != before.offline() && !after.offline() {
-            // Back online: give failed tracks another go.
-            store::retry_failed(&self.state.db.conn());
+        if after.offline() != before.offline() {
+            if !after.offline() {
+                // Back online: give failed tracks another go.
+                store::retry_failed(&self.state.db.conn());
+            }
+            // Home is built from downloads offline (`smart::home::offline_home`): rebuild it.
+            crate::smart::home::emit_changed(&*self.state.host, "network", None);
         }
         let _ = self.state.host.emit("downloads:network", self.net_status());
         self.wake.notify_one();

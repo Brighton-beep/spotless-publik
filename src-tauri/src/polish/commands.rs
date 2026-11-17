@@ -8,7 +8,6 @@ use innertube::explore::{ChartsPage, NewReleasesPage, SectionsPage};
 use innertube::SongItem;
 use tauri::State;
 
-use super::context::PlayContext;
 use super::health::Health;
 use crate::state::AppState;
 
@@ -52,24 +51,12 @@ pub async fn playback_health(state: St<'_>) -> Result<Health, String> {
 }
 
 /// Recently played contexts with listen counts, newest first (what Home's shortcuts read).
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RecentPlayContext {
-    #[serde(flatten)]
-    context: PlayContext,
-    plays: i64,
-    played_at: i64,
-}
-
 #[tauri::command]
 pub async fn recent_play_contexts(
     state: St<'_>,
     limit: Option<usize>,
-) -> Result<Vec<RecentPlayContext>, String> {
-    Ok(super::context::recorded(&state.db, limit.unwrap_or(50))
-        .into_iter()
-        .map(|(context, plays, played_at)| RecentPlayContext { context, plays, played_at })
-        .collect())
+) -> Result<Vec<super::context::RecentPlayContext>, String> {
+    Ok(super::context::recent_play_contexts(&state.db, limit))
 }
 
 /// The YouTube video an RSS episode streams from, when one was matched (no network).

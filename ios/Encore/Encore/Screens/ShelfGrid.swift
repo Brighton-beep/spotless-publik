@@ -1,6 +1,6 @@
 // A Home shelf's "Show all" page: Spotify iOS opens every shelf as a two-column grid of its cards
 // under a back bar with the shelf's title. Reads the shelf from `HomeStore`, so it stays current
-// (and offline it shows what Home shows).
+// (offline that's the core's offline Home).
 import SwiftUI
 
 struct ShelfGridView: View {
@@ -13,10 +13,6 @@ struct ShelfGridView: View {
 
     private var items: [ShelfItem] {
         if let category { return category }
-        if app.downloads.offline {
-            let off = HomeStore.offlineShelves(app.home.shelves, downloads: app.downloads.snapshot.collections, done: app.downloads.done)
-            return off.first { $0.id == id }?.items ?? []
-        }
         return app.home.shelf(id)?.items ?? []
     }
 

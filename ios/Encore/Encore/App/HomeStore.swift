@@ -1,5 +1,5 @@
 // Home's shelves as a store (not view state), so they can move the moment you play something,
-// back a shelf's "Show all" page, and stand in offline. The pure helpers are what the tests pin.
+// back a shelf's "Show all" page; offline the core builds them from downloads. The pure helpers are what the tests pin.
 import SwiftUI
 import Observation
 
@@ -15,23 +15,38 @@ final class HomeStore {
 
     init(core: CoreClient) { self.core = core }
 
+    /// A `smart_home` answer came back (even an empty one): Home stops showing skeletons.
+    var loaded = false
+    /// The last try threw with nothing on screen: Home shows the error with Reload.
+    var failed = false
+
     /// Loads `smart_home`. Online it retries with the desktop's backoff (2 s doubling, capped at
     /// 30 s) until YouTube's own shelves are in: a Home of only local shelves or moods means
     /// YouTube's part failed (bot wall), and if it failed outright no `home-changed` follows.
-    /// Offline it never retries: Home is built from your downloads instead (`offlineShelves`).
+    /// Offline the core builds Home from your downloads (`offline_home`): one try, no network.
     func load(isOffline: @escaping @MainActor () -> Bool) async {
         if isOffline() {
-            // A cold start offline still gets the core's local shelves (one try, no network).
-            if shelves.isEmpty, let got = try? await core.smartHome(), !got.isEmpty { shelves = got; loadedAt = Date() }
+            await fetch(keepNonEmpty: false)
             return
         }
         var delay: UInt64 = 2_000_000_000
         for _ in 0..<6 {
-            let got = (try? await core.smartHome()) ?? []
-            if !got.isEmpty { shelves = got; loadedAt = Date() }
+            await fetch(keepNonEmpty: true)
             if Self.complete(shelves) || Task.isCancelled || isOffline() { return }
             try? await Task.sleep(nanoseconds: delay)
             delay = min(delay * 2, 30_000_000_000)
+        }
+    }
+
+    /// One `smart_home` call. Online an empty answer keeps what's on screen (a partial reload).
+    private func fetch(keepNonEmpty: Bool) async {
+        do {
+            let got = try await core.smartHome()
+            if !got.isEmpty || !keepNonEmpty || shelves.isEmpty { shelves = got; loadedAt = Date() }
+            loaded = true
+            failed = false
+        } catch {
+            failed = shelves.isEmpty
         }
     }
 
@@ -125,6 +140,7 @@ final class HomeStore {
     /// The "Music" chip: no podcast or episode tiles anywhere, and no shelf left empty by that.
     nonisolated static func musicOnly(_ shelves: [Shelf]) -> [Shelf] {
         shelves.compactMap { s in
+            if s.layout == .notice { return s }
             var s = s
             s.items = s.items.filter { !podcastKinds.contains($0.kind) }
             let podcastShelf = s.id.contains("podcast") || s.id.contains("episode")
@@ -132,32 +148,4 @@ final class HomeStore {
         }
     }
 
-    /// Home offline (Spotify): shortcuts you can still play, a "Downloaded" shelf first, and the
-    /// recently played songs that are on the phone. Nothing that would need YouTube.
-    nonisolated static func offlineShelves(_ shelves: [Shelf], downloads: [DownloadCollectionStatus], done: Set<String>) -> [Shelf] {
-        let have = Set(downloads.map { key($0.id) })
-        var out: [Shelf] = []
-        if let s = shelves.first(where: { $0.layout == .shortcuts }) {
-            let items = s.items.filter { have.contains(key($0.id)) }
-            if !items.isEmpty { var c = s; c.items = items; out.append(c) }
-        }
-        // Home's own tile for a download, when it has one, carries the better title and art.
-        var known: [String: ShelfItem] = [:]
-        for it in shelves.flatMap(\.items) where known[key(it.id)] == nil { known[key(it.id)] = it }
-        let cards = downloads.sorted { $0.addedAt > $1.addedAt }.map { d -> ShelfItem in
-            if d.kind == "liked" || key(d.id) == likedPlaylistId {
-                return ShelfItem(kind: "liked", id: likedPlaylistId, title: "Liked Songs", subtitle: "\(d.total) songs", explicit: false)
-            }
-            let k = known[key(d.id)]
-            let title = d.title.isEmpty || d.title == d.id ? (k?.title ?? d.title) : d.title
-            return ShelfItem(kind: k?.kind ?? d.kind, id: d.id, title: title, subtitle: d.subtitle ?? k?.subtitle,
-                             thumbnail: d.thumbnail ?? k?.thumbnail, explicit: false)
-        }
-        if !cards.isEmpty { out.append(Shelf(id: "downloaded", title: "Downloaded", layout: .cards, source: "local", items: cards)) }
-        if let s = shelves.first(where: { $0.id == "recently_played" }) {
-            let items = s.items.filter { $0.kind == "song" ? done.contains($0.id) : have.contains(key($0.id)) }
-            if !items.isEmpty { var c = s; c.items = items; out.append(c) }
-        }
-        return out
-    }
 }

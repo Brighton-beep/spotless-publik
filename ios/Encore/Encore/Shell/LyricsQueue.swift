@@ -159,7 +159,7 @@ struct LyricsFullView: View {
                     .padding(.horizontal, Space.xl)
                     .padding(.vertical, 120)
                     if let l = model.lyrics, !model.lines.isEmpty {
-                        Text("Lyrics from \(lyricsSourceName(l))").font(Typo.font(12)).foregroundStyle(.white.opacity(0.7))
+                        Text(lyricsAttribution(l)).font(Typo.font(12)).foregroundStyle(.white.opacity(0.7))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, Space.xl).padding(.bottom, Space.xl)
                     }
@@ -221,8 +221,8 @@ struct LyricsMenu: View {
             } label: { Label("Lyrics source", systemImage: "music.mic") }
             if l?.synced == true {
                 Menu {
-                    Button { Task { await model.nudge(-500, app) } } label: { Label("Show lyrics earlier", systemImage: "minus") }
-                    Button { Task { await model.nudge(500, app) } } label: { Label("Show lyrics later", systemImage: "plus") }
+                    Button { Task { await model.nudge(-250, app) } } label: { Label("Show lyrics earlier", systemImage: "minus") }
+                    Button { Task { await model.nudge(250, app) } } label: { Label("Show lyrics later", systemImage: "plus") }
                     if offset != 0 {
                         Button { Task { await model.nudge(-offset, app) } } label: { Label("Reset timing", systemImage: "arrow.counterclockwise") }
                     }
@@ -244,12 +244,12 @@ struct LyricsMenu: View {
     }
 }
 
-/// "LRCLIB" / "YouTube Music": where the lyrics came from (our attribution line).
-func lyricsSourceName(_ l: Lyrics) -> String {
-    let p = (l.provider.isEmpty ? l.source : l.provider).lowercased()
-    if p.contains("lrclib") { return "LRCLIB" }
-    if p.contains("youtube") || p.contains("ytm") { return "YouTube Music" }
-    return l.provider.isEmpty ? l.source : l.provider
+/// "Lyrics provided by LRCLIB": the desktop's attribution line (`lyrics.svelte.ts` `attribution`),
+/// from the provider's attribution string, else its id.
+func lyricsAttribution(_ l: Lyrics) -> String {
+    let src = l.source.replacingOccurrences(of: #"^Source:\s*"#, with: "", options: [.regularExpression, .caseInsensitive])
+        .trimmingCharacters(in: .whitespaces)
+    return "Lyrics provided by \(src.isEmpty ? l.provider : src)"
 }
 
 /// Calls `onUserScroll` when the user drags the scroll view (iOS 18+; a no-op before).

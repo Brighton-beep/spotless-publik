@@ -859,6 +859,18 @@ pub async fn import_start(state: St<'_>, lists: Vec<usize>) -> Result<crate::imp
     api::import_start(&state, lists).await
 }
 
+/// First run: offer the import? Only for an empty library, until answered (`library::import_offer`).
+#[tauri::command]
+pub fn import_offer(state: St<'_>) -> bool {
+    encore_core::library::import_offer_db(&state.db)
+}
+
+/// The first-run import offer was answered (imported or "Not now").
+#[tauri::command]
+pub fn import_offer_done(state: St<'_>) {
+    encore_core::library::import_offer_done(&state.db)
+}
+
 #[tauri::command]
 pub async fn import_status() -> Result<Option<crate::import::Snapshot>, String> {
     api::import_status().await

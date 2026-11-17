@@ -75,13 +75,15 @@ extension MockCoreClient {
         }
     }
 
-    func importCreate() async throws {
+    func importCreate(names: [Int: String], local: Bool) async throws {
         let s = try withLock { () -> ImportSnapshot in
             guard var s = fs.importSnap, s.phase == "review" else { throw MockError.missing("gone") }
             let skipped = fs.importRows.filter { $0.pick == nil || $0.tier == "missing" }.count
+            let local = local || !mockSignedIn
             s.phase = "done"
-            s.results = s.lists.map {
-                ImportResult(kind: $0.kind, name: $0.name, id: "LOCALPLAYLIST:1", local: true, added: max($0.count, 25), missing: skipped, removed: 0)
+            s.results = s.lists.enumerated().map { i, l in
+                ImportResult(kind: l.kind, name: names[i] ?? l.name, id: local ? "LOCALPLAYLIST:1" : "PLmockimport\(i)", local: local,
+                             added: max(l.count, 25), missing: skipped, removed: 0)
             }
             fs.importSnap = s
             fs.settings[SettingKey.importDone] = "true"
@@ -113,8 +115,19 @@ extension ImportFlow {
     func openReview(_ app: AppModel) async {
         settled = [:]
         tiers = [:]
+        let lists = snapshot?.lists ?? []
+        name = lists.count == 1 ? Self.listName(lists[0]) : ""
+        onAccount = false
         go(.review)
     }
+
+    /// A list's name as the import shows it (the desktop's `listName`).
+    static func listName(_ l: ImportSnapshot.L) -> String {
+        l.kind == "liked" ? "Liked Songs" : l.kind == "history" ? "Listening history" : l.name
+    }
+
+    /// Only Liked Songs and history: nothing to name or place (the desktop's `onlyLiked`).
+    var onlyLiked: Bool { (snapshot?.lists ?? []).allSatisfy { $0.kind == "liked" || $0.kind == "history" } }
 
     /// The rows that need a look: uncertain first, then not found.
     func openCheck(_ app: AppModel) async {
@@ -145,11 +158,19 @@ extension ImportFlow {
         } catch { self.error = "That change couldn't be saved." }
     }
 
-    /// Write everything (`import_create`); the progress step follows it to Done.
+    /// Write everything (`import_create`); the progress step follows it to Done. Like the desktop:
+    /// Liked Songs carries its playlist name, a single playlist the name typed here, and signed
+    /// in it goes where you picked (signed out always on this phone).
     func create(_ app: AppModel) async {
         guard !creating else { return }
         creating = true
-        do { try await app.core.importCreate() } catch {
+        var names: [Int: String] = [:]
+        let lists = snapshot?.lists ?? []
+        for (i, l) in lists.enumerated() where l.kind == "liked" { names[i] = "Liked Songs from Spotify" }
+        let typed = name.trimmingCharacters(in: .whitespaces)
+        if lists.count == 1, lists[0].kind == "playlist", !typed.isEmpty { names[0] = typed }
+        let local = !app.account.signedIn || !onAccount
+        do { try await app.core.importCreate(names: names, local: local) } catch {
             creating = false
             self.error = "The import couldn't be saved."
             return
@@ -221,6 +242,7 @@ struct ImportReviewStep: View {
                     .padding(.top, Space.m)
             }
             Spacer(minLength: Space.xl)
+            options(s)
             Spacer(minLength: 0)
             if let e = flow.error {
                 Text(e).font(Typo.font(14)).foregroundStyle(Palette.negative).padding(.bottom, Space.s)
@@ -236,6 +258,39 @@ struct ImportReviewStep: View {
         .padding(.horizontal, Space.xl)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("import-review")
+    }
+
+    /// The desktop's review options: rename a single imported playlist, and signed in, where the
+    /// playlists go ("On this iPhone" or "On YouTube Music").
+    @ViewBuilder private func options(_ s: ImportSnapshot?) -> some View {
+        let single = (s?.lists.count ?? 0) == 1 && !flow.onlyLiked
+        let place = app.account.signedIn && !flow.onlyLiked
+        if single || place {
+            VStack(alignment: .leading, spacing: Space.m) {
+                if single {
+                    TextField("", text: $flow.name, prompt: Text("Playlist name").foregroundStyle(Palette.dim))
+                        .font(Typo.font(16)).foregroundStyle(Palette.text)
+                        .padding(.horizontal, Space.m).frame(height: 44)
+                        .background(RoundedRectangle(cornerRadius: Radius.s).fill(Palette.tinted))
+                        .accessibilityLabel("Playlist name")
+                        .accessibilityIdentifier("import-name")
+                }
+                if place {
+                    Text("Save playlists").font(Typo.font(14)).foregroundStyle(Palette.subdued)
+                    HStack(spacing: Space.s) {
+                        Chip(title: "On this iPhone", selected: !flow.onAccount) { flow.onAccount = false }
+                            .accessibilityIdentifier("import-where-device")
+                            .accessibilityAddTraits(!flow.onAccount ? .isSelected : [])
+                        Chip(title: "On YouTube Music", selected: flow.onAccount) { flow.onAccount = true }
+                            .accessibilityIdentifier("import-where-account")
+                            .accessibilityAddTraits(flow.onAccount ? .isSelected : [])
+                    }
+                }
+            }
+            .padding(Space.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: Radius.l).fill(Palette.highlight))
+        }
     }
 }
 

@@ -87,7 +87,9 @@ final class ImportSnapshotTests: SnapshotCase {
     func testNotNowMarksDone() async {
         app.router.handle(URL(string: "encore://import")!, app: app)
         XCTAssertTrue(app.importOpen)
-        app.settings.set(SettingKey.importDone, true)
-        XCTAssertFalse(app.shouldOfferImport)
+        app.importOfferAnswered()
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let offer = await app.shouldOfferImport()
+        XCTAssertFalse(offer)
     }
 }

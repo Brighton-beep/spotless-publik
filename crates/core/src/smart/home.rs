@@ -17,6 +17,10 @@
 //! | `moods` | Moods & genres tiles | YT |
 //!
 //! Everything goes through the shared filter (blocked songs/artists, explicit).
+//!
+//! Offline (no network or offline mode) Home is [`offline_home`] instead: an `offline` notice
+//! shelf (layout `notice`, no items), the playable shortcuts, `downloaded` and the downloaded
+//! recently played songs.
 
 use std::collections::{HashMap, HashSet};
 
@@ -578,6 +582,86 @@ pub fn local_home(db: &Db) -> Vec<Shelf> {
     local_shelves(db, &super::taste::profile(db), &Filter::load(db))
 }
 
+/// Home offline (Spotify), for both apps: a "You're offline" notice, the shortcuts you can still
+/// play, a "Downloaded" shelf (newest first) and the recently played songs that are on this
+/// device. Nothing that would need YouTube.
+pub fn offline_home(db: &Db) -> Vec<Shelf> {
+    let downloads = db.with_conn(crate::downloads::store::statuses);
+    let done: HashSet<String> =
+        db.with_conn(crate::downloads::store::done_index).into_iter().map(|(id, ..)| id).collect();
+    offline_shelves(local_home(db), &downloads, &done)
+}
+
+/// Liked Songs is `liked` in Home's tiles and `VLLM` in downloads: one key for both.
+fn offline_key(id: &str) -> &str {
+    if id == "liked" { crate::library::LIKED_ID } else { id }
+}
+
+/// [`offline_home`]'s rule, given the local shelves, the downloaded collections and the finished
+/// track ids.
+pub fn offline_shelves(
+    shelves: Vec<Shelf>,
+    downloads: &[crate::downloads::store::CollectionStatus],
+    done: &HashSet<String>,
+) -> Vec<Shelf> {
+    let have: HashSet<&str> = downloads.iter().map(|d| offline_key(&d.id)).collect();
+    // Home's own tile for a download, when it has one, carries the better title and art.
+    let mut known: HashMap<&str, &ShelfItem> = HashMap::new();
+    for it in shelves.iter().flat_map(|s| &s.items) {
+        known.entry(offline_key(&it.id)).or_insert(it);
+    }
+    let mut newest: Vec<&crate::downloads::store::CollectionStatus> = downloads.iter().collect();
+    newest.sort_by_key(|d| std::cmp::Reverse(d.added_at));
+    let cards: Vec<ShelfItem> = newest
+        .into_iter()
+        .map(|d| {
+            if d.kind == "liked" || offline_key(&d.id) == crate::library::LIKED_ID {
+                return ShelfItem {
+                    subtitle: Some(format!("{} songs", d.total)),
+                    ..item("liked", "liked", "Liked Songs")
+                };
+            }
+            let k = known.get(offline_key(&d.id)).copied();
+            let title = if d.title.is_empty() || d.title == d.id {
+                k.map(|k| k.title.clone()).unwrap_or_else(|| d.title.clone())
+            } else {
+                d.title.clone()
+            };
+            ShelfItem {
+                subtitle: d.subtitle.clone().or_else(|| k.and_then(|k| k.subtitle.clone())),
+                thumbnail: d.thumbnail.clone().or_else(|| k.and_then(|k| k.thumbnail.clone())),
+                ..item(k.map_or(d.kind.as_str(), |k| k.kind.as_str()), &d.id, &title)
+            }
+        })
+        .collect();
+    let subtitle = if cards.is_empty() {
+        "Download music to listen without a connection. It shows up here."
+    } else {
+        "Only music on this device plays until you're back online."
+    };
+    let mut out = vec![Shelf {
+        subtitle: Some(subtitle.into()),
+        ..shelf("offline", "You're offline", "notice", "local", vec![])
+    }];
+    let kept = |s: &Shelf, f: &dyn Fn(&ShelfItem) -> bool| {
+        let items: Vec<ShelfItem> = s.items.iter().filter(|i| f(i)).cloned().collect();
+        (!items.is_empty()).then(|| Shelf { items, ..s.clone() })
+    };
+    out.extend(
+        shelves
+            .iter()
+            .find(|s| s.layout == "shortcuts")
+            .and_then(|s| kept(s, &|i| have.contains(offline_key(&i.id)))),
+    );
+    if !cards.is_empty() {
+        out.push(shelf("downloaded", "Downloaded", "cards", "local", cards));
+    }
+    out.extend(shelves.iter().find(|s| s.id == "recently_played").and_then(|s| {
+        kept(s, &|i| if i.kind == "song" { done.contains(&i.id) } else { have.contains(offline_key(&i.id)) })
+    }));
+    out
+}
+
 /// Turn YouTube's own home sections into shelves.
 fn youtube_shelves(page: &innertube::HomePage, filter: &Filter) -> Vec<Shelf> {
     page.sections
@@ -675,6 +759,9 @@ async fn youtube_home(state: &AppState) -> Option<YoutubeHome> {
 /// The whole Home. Local shelves first, then the ones that need artist pages, then YouTube's.
 pub async fn home(state: &AppState) -> Vec<Shelf> {
     let db = &state.db;
+    if crate::downloads::offline() {
+        return offline_home(db);
+    }
     let taste = super::taste::profile(db);
     let filter = Filter::load(db);
     let mut shelves = local_shelves(db, &taste, &filter);
@@ -901,6 +988,79 @@ pub async fn mix_tracks(state: &AppState, id: &str, size: usize) -> Result<Vec<S
 mod tests {
     use super::*;
     use crate::identity::tests::song;
+
+    fn dl(id: &str, kind: &str, title: &str, added_at: i64) -> crate::downloads::store::CollectionStatus {
+        crate::downloads::store::CollectionStatus {
+            id: id.into(),
+            kind: kind.into(),
+            title: title.into(),
+            subtitle: None,
+            thumbnail: None,
+            total: 3,
+            done: 3,
+            failed: 0,
+            bytes: 0,
+            added_at,
+        }
+    }
+
+    #[test]
+    fn offline_home_only_shows_whats_on_the_device() {
+        let shortcuts = vec![
+            item("liked", "liked", "Liked Songs"),
+            ShelfItem { thumbnail: Some("art".into()), ..item("album", "MPRE1", "Album One") },
+            item("playlist", "PL2", "Not downloaded"),
+        ];
+        let played = vec![
+            song_item(&song("s1", "Song 1", "A", None, "3:00")),
+            song_item(&song("s2", "Song 2", "A", None, "3:00")),
+        ];
+        let shelves = vec![
+            shelf("shortcuts", "", "shortcuts", "local", shortcuts),
+            shelf("recently_played", "Recently played", "cards", "local", played),
+            shelf("jump_back_in", "Jump back in", "cards", "local", vec![item("album", "MPRE9", "x")]),
+        ];
+        // The album downloaded first with its id as a placeholder title, Liked Songs later.
+        let downloads = [dl("MPRE1", "album", "MPRE1", 1), dl("VLLM", "liked", "Liked Songs", 2)];
+        let done: HashSet<String> = ["s2".to_string()].into();
+        let out = offline_shelves(shelves, &downloads, &done);
+        let ids: Vec<&str> = out.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, ["offline", "shortcuts", "downloaded", "recently_played"]);
+        assert_eq!(out[0].title, "You're offline");
+        assert_eq!(out[0].layout, "notice");
+        let tiles: Vec<&str> = out[1].items.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(tiles, ["liked", "MPRE1"]);
+        // Newest download first; Home's tile lends the album its title and art.
+        let cards = &out[2].items;
+        assert_eq!((cards[0].kind.as_str(), cards[0].id.as_str()), ("liked", "liked"));
+        assert_eq!(cards[0].subtitle.as_deref(), Some("3 songs"));
+        assert_eq!((cards[1].title.as_str(), cards[1].thumbnail.as_deref()), ("Album One", Some("art")));
+        let songs: Vec<&str> = out[3].items.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(songs, ["s2"]);
+    }
+
+    #[test]
+    fn offline_home_without_downloads_is_just_the_notice() {
+        let shelves = vec![shelf(
+            "recently_played",
+            "Recently played",
+            "cards",
+            "local",
+            vec![song_item(&song("s1", "Song 1", "A", None, "3:00"))],
+        )];
+        let out = offline_shelves(shelves, &[], &HashSet::new());
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].id, "offline");
+        assert!(out[0].subtitle.as_deref().unwrap().starts_with("Download music"));
+    }
+
+    #[test]
+    fn offline_home_reads_the_download_tables() {
+        let db = super::super::test_db();
+        db.with_conn(crate::downloads::store::migrate);
+        let out = offline_home(&db);
+        assert_eq!(out[0].id, "offline");
+    }
 
     fn heard(
         id: &str,

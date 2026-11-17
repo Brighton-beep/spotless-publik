@@ -1310,6 +1310,8 @@ pub fn run() {
             commands::import_read_file,
             commands::import_start,
             commands::import_status,
+            commands::import_offer,
+            commands::import_offer_done,
             commands::import_rows,
             commands::import_pick,
             commands::import_create,

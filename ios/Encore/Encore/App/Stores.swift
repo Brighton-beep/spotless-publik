@@ -437,8 +437,15 @@ final class AppModel {
         StreamQuality.shared.attach(self)
     }
 
-    /// First launch: offer the Spotify import (skippable; never again once done or skipped).
-    var shouldOfferImport: Bool { settings.values[SettingKey.importDone] != "true" }
+    /// First launch: offer the Spotify import. One rule with the Mac, in the core: an empty library
+    /// and the offer never answered (`import_offer`).
+    func shouldOfferImport() async -> Bool { (try? await core.importOffer()) ?? false }
+
+    /// The first-run offer was answered (imported, or closed): never again, on either app.
+    func importOfferAnswered() {
+        settings.values[SettingKey.importDone] = "true"
+        Task { try? await core.importOfferDone() }
+    }
 
     func apply(_ ev: CoreEvent) {
         PlaybackBridge.shared.handle(ev)
@@ -479,7 +486,10 @@ final class AppModel {
                 if scope == "podcasts" || scope == "episodes" { await podcasts.refresh() } else { await library.refresh() }
             }
         case .podcastProgress(let id, let p): podcasts.progress[id] = p
-        case .downloadsChanged: Task { await downloads.refresh() }
+        case .downloadsChanged:
+            Task { await downloads.refresh() }
+            // Offline, Home is your downloads (the core's `offline_home`).
+            if downloads.offline { homeSerial += 1 }
         case .downloadsProgress(let list):
             downloads.active = Dictionary(list.map { ($0.videoId, $0) }, uniquingKeysWith: { a, _ in a })
         case .downloadsNetwork(let n): downloads.setNetwork(n)

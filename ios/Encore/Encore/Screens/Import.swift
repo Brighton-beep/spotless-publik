@@ -40,6 +40,10 @@ final class ImportFlow {
     var rowsLoading = false
     var settled: [String: Bool] = [:]
     var choosing: ImportRow?
+    /// Review options (the desktop's): the single playlist's name, and signed in, YouTube Music
+    /// rather than this phone.
+    var name = ""
+    var onAccount = false
     /// `encore://import?…&step=done`: skip the review and create with the best picks.
     var autoCreate = false
     /// The link step's "Show me how" sheet (how to copy your profile link in Spotify).
@@ -348,7 +352,7 @@ struct ImportOnboarding: View {
     }
 
     private func finish(toLibrary: Bool) {
-        app.settings.set(SettingKey.importDone, true)
+        app.importOfferAnswered()
         app.importOpen = false
         if toLibrary {
             app.router.dismissOverlays()

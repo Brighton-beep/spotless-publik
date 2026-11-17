@@ -248,6 +248,38 @@ struct EntityLoadState: View {
     }
 }
 
+/// An empty list (the desktop's EmptyState): an optional icon, a 24/700 title, a subdued line
+/// and an optional white pill.
+struct EntityEmptyState: View {
+    var icon: String?
+    let title: String
+    let line: String
+    var action: String?
+    var onAction: () -> Void = {}
+    var body: some View {
+        VStack(spacing: Space.m) {
+            if let icon { Icon(name: icon, size: 56).foregroundStyle(Palette.subdued).padding(.bottom, Space.xs) }
+            Text(title).font(Typo.font(24, .bold))
+            Text(line).font(Typo.font(16)).foregroundStyle(Palette.subdued)
+            if let action {
+                Button(action: onAction) {
+                    Text(action).font(Typo.button).foregroundStyle(.black)
+                        .padding(.horizontal, 32).frame(height: 48).background(Capsule().fill(.white))
+                }
+                .buttonStyle(PressScale())
+                .padding(.top, Space.s)
+                .accessibilityIdentifier("entity-empty-action")
+            }
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 64)
+        .padding(.horizontal, Space.gutter)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("entity-empty")
+    }
+}
+
 // MARK: playlist
 
 struct PlaylistView: View {
@@ -345,6 +377,15 @@ struct PlaylistView: View {
                 if smarts.loadingMore { ProgressView().tint(Palette.subdued).frame(maxWidth: .infinity).frame(height: 56) }
                 if finding && rows.isEmpty { FindNoMatch(query: query) }
                 if page == nil { EntityLoadState(failed: failed) { failed = false; attempt += 1 } }
+                // The desktop's empty states: Liked Songs points at Search; someone else's says so.
+                if let p = page, p.items.isEmpty, !finding {
+                    if isLiked {
+                        EntityEmptyState(icon: "heart", title: "Songs you like will appear here",
+                                         line: "Save songs by tapping the heart icon.", action: "Find songs") { app.router.select(.search) }
+                    } else if p.owned != true && !isMfy {
+                        EntityEmptyState(title: "This playlist is empty", line: "There's nothing here yet.")
+                    }
+                }
                 if isOwn && !finding && page != nil && (recsLoading || !recs.isEmpty) {
                     RecommendedSection(recs: recs, loading: recsLoading, onAdd: addRecommendation) { recsBatch += 1 }
                 }

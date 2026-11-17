@@ -39,6 +39,20 @@ struct DeletedPlaylist: Codable, Hashable, Identifiable {
 }
 
 /// One row of the local listening history (`lib_recent_tracks`).
+/// A context you played from (`recent_play_contexts`, core `polish::context::RecentPlayContext`).
+struct RecentPlayContext: Codable, Hashable {
+    /// playlist | album | artist | liked | podcast | radio | mix | daily_mix | audiobook
+    var kind: String
+    var id: String
+    var title: String
+    var subtitle: String?
+    var thumbnail: String?
+    /// radio only: the seed's kind when it isn't a song.
+    var params: String?
+    var plays: Int
+    var playedAt: Int64
+}
+
 struct RecentTrack: Codable, Hashable {
     var song: SongItem
     var playedAt: Int64

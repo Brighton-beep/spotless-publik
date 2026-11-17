@@ -17,7 +17,6 @@ desktop-only: library state iOS reads from lib_snapshot instead: lib_folders lib
 desktop-only: downloads folder and manual sync (iOS stores in its container and syncs on change): downloads_set_dir downloads_sync
 desktop-only: YouTube's Library > Songs tab and its unused history/suggestions browses (Spotify iOS has Liked Songs only; Recents reads lib_recent_tracks, Recommended reads playlist_recommendations; the desktop UI calls neither get_history nor get_playlist_suggestions): set_song_saved get_history get_playlist_suggestions
 desktop-only: desktop pages and columns Spotify iOS doesn't have (Live now, video and card search where iOS pages with search_page, the taste profile view, a Plays column, skip-reason greying where iOS uses playable_flags): get_live_now search_videos search_cards taste_profile play_counts playback_skip_reasons
-desktop-only: the desktop history page's context rows (iOS Recents lists songs from lib_recent_tracks; recent contexts reach Your Library and Home through lib_recent_contexts and smart_home): recent_play_contexts
 desktop-only: Spotify import extras (re-sync an imported playlist): import_source import_update
 desktop-only: drag and drop in the sidebar and track table (iOS reorders with lib_playlist_set_order and move_in_playlist; no pin or folder drag on Spotify iOS): lib_pins_reorder lib_folder_move lib_playlist_move
 desktop-only: the computer's account name (iOS uses the YouTube account or profile_name): local_user_name

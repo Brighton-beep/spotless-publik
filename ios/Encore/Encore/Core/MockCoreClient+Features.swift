@@ -102,7 +102,7 @@ extension MockCoreClient {
                                    trackCount: n, generatedAt: now - 3600, nextRefresh: now + 7 * day), poolSlice(c * 5, n)))
         }
         fs.whatsNewSeenAt = now - 2 * day
-        fs.settings = [SettingKey.streamQuality: "auto", SettingKey.cellularQuality: "normal", SettingKey.dataSaver: "false",
+        fs.settings = [SettingKey.streamQuality: "auto", SettingKey.cellularQuality: "auto", SettingKey.dataSaver: "false",
                        SettingKey.gapless: "true", SettingKey.canvas: "true", SettingKey.youtubeAccount: "",
                        SettingKey.downloadCellular: "false"]
         // The onboarding flag outlives the mock (the real core persists every setting).
@@ -296,8 +296,10 @@ extension MockCoreClient {
             var tiles: [ShelfItem] = started.map { var i = ep($0); i.progress = $0.progress.fraction; return i }
             for e in fresh where !tiles.contains(where: { $0.id == e.id }) { var i = ep(e); i.newEpisode = true; tiles.append(i) }
             let shows = fs.searchResults.shows.filter { s in !fs.follows.contains { $0.title == s.title } }
-            let cats = [("1303", "Comedy", "#e13300"), ("1489", "News", "#1e3264"), ("1488", "True Crime", "#8c1932"),
-                        ("1324", "Society & Culture", "#477d95"), ("1545", "Sports", "#27856a"), ("1321", "Business", "#503750")]
+            // The core's category tiles (smart/podhome.rs): the shared palette in order.
+            let p = BrowseTiles.palette
+            let cats = [("1303", "Comedy", p[0]), ("1489", "News", p[1]), ("1488", "True Crime", p[2]),
+                        ("1324", "Society & Culture", p[3]), ("1545", "Sports", p[4]), ("1321", "Business", p[5])]
             let shelves = [
                 Shelf(id: "shortcuts", title: "", layout: .shortcuts, source: "local", items: Array(tiles.prefix(8))),
                 Shelf(id: "pod_new", title: "New episodes", layout: .cards, source: "local", items: fresh.prefix(12).map(ep)),
@@ -526,6 +528,42 @@ extension MockCoreClient {
         }
     }
 
+    /// The core's offline Home (`smart::home::offline_shelves`), for the mock: the notice, the
+    /// playable shortcuts, "Downloaded" newest first, and the downloaded recently played songs.
+    func offlineHomeLocked(_ shelves: [Shelf]) -> [Shelf] {
+        Self.offlineShelves(shelves, downloads: statusLocked(), done: Set(fs.dlTracks.filter { $0.value.state == 2 }.keys))
+    }
+
+    nonisolated static func offlineShelves(_ shelves: [Shelf], downloads: [DownloadCollectionStatus], done: Set<String>) -> [Shelf] {
+        let key = HomeStore.key
+        let have = Set(downloads.map { key($0.id) })
+        var known: [String: ShelfItem] = [:]
+        for it in shelves.flatMap(\.items) where known[key(it.id)] == nil { known[key(it.id)] = it }
+        let cards = downloads.sorted { $0.addedAt > $1.addedAt }.map { d -> ShelfItem in
+            if d.kind == "liked" || key(d.id) == likedPlaylistId {
+                return ShelfItem(kind: "liked", id: "liked", title: "Liked Songs", subtitle: "\(d.total) songs", explicit: false)
+            }
+            let k = known[key(d.id)]
+            let title = d.title.isEmpty || d.title == d.id ? (k?.title ?? d.title) : d.title
+            return ShelfItem(kind: k?.kind ?? d.kind, id: d.id, title: title, subtitle: d.subtitle ?? k?.subtitle,
+                             thumbnail: d.thumbnail ?? k?.thumbnail, explicit: false)
+        }
+        var out = [Shelf(id: "offline", title: "You're offline",
+                         subtitle: cards.isEmpty ? "Download music to listen without a connection. It shows up here."
+                             : "Only music on this device plays until you're back online.",
+                         layout: .notice, source: "local", items: [])]
+        if var s = shelves.first(where: { $0.layout == .shortcuts }) {
+            s.items = s.items.filter { have.contains(key($0.id)) }
+            if !s.items.isEmpty { out.append(s) }
+        }
+        if !cards.isEmpty { out.append(Shelf(id: "downloaded", title: "Downloaded", layout: .cards, source: "local", items: cards)) }
+        if var s = shelves.first(where: { $0.id == "recently_played" }) {
+            s.items = s.items.filter { $0.kind == "song" ? done.contains($0.id) : have.contains(key($0.id)) }
+            if !s.items.isEmpty { out.append(s) }
+        }
+        return out
+    }
+
     private func snapshotLocked() -> DownloadsSnapshot {
         let all = Array(fs.dlTracks.values)
         let done = all.filter { $0.state == 2 }
@@ -643,6 +681,14 @@ extension MockCoreClient {
         withLock { fs.settings[key] = value }
         if key == SettingKey.importDone { UserDefaults.standard.set(value, forKey: "mock." + key) }
     }
+
+    /// The core's `library::import_offer`: an empty library and the offer never answered.
+    func importOffer() async throws -> Bool {
+        withLock {
+            fs.settings[SettingKey.importDone] != "true" && liked.isEmpty && playlists.isEmpty && saved.isEmpty
+        }
+    }
+    func importOfferDone() async throws { try await setSetting(key: SettingKey.importDone, value: "true") }
 
     // MARK: import (canned answers in the shapes import2.md documents)
 
@@ -883,6 +929,19 @@ extension MockCoreClient {
             let noon = Int64(Calendar.current.startOfDay(for: Date(timeIntervalSince1970: now)).timeIntervalSince1970) + 12 * 3_600
             return liked.prefix(limit ?? 50).enumerated().map { i, l in
                 RecentTrack(song: l.song, playedAt: noon - Int64(i) * 60, plays: 1 + i % 4) // minutes apart from noon: one "Today" group at any hour
+            }
+        }
+    }
+
+    /// The contexts you played from: the mock's recents, newest first.
+    func recentPlayContexts(limit: Int?) async throws -> [RecentPlayContext] {
+        withLock {
+            guard !fs.historyCleared else { return [] }
+            return recents.prefix(limit ?? 50).compactMap { r -> RecentPlayContext? in
+                guard let c = r.card else { return nil }
+                let liked = c.id == likedPlaylistId
+                return RecentPlayContext(kind: liked ? "liked" : c.kind.rawValue, id: c.id, title: liked ? "Liked Songs" : c.title,
+                                         subtitle: c.subtitle, thumbnail: c.thumbnail, params: nil, plays: 1, playedAt: Int64(r.playedAt))
             }
         }
     }

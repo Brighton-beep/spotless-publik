@@ -65,7 +65,7 @@ private struct AppRoot: View {
                 // The optional first-run step: Spotify import (never under tests or deep-linked launches).
                 let env = ProcessInfo.processInfo.environment
                 if UserDefaults.standard.string(forKey: "deeplink") == nil, env["XCTestConfigurationFilePath"] == nil,
-                   !ProcessInfo.processInfo.arguments.contains("-uitest"), app.shouldOfferImport {
+                   !ProcessInfo.processInfo.arguments.contains("-uitest"), await app.shouldOfferImport() {
                     app.importOpen = true
                 }
                 // `-deeplink encore://…` launch argument: screenshots and UI tests reach a screen

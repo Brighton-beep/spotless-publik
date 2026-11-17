@@ -450,6 +450,11 @@ pub(crate) async fn dispatch(st: &Arc<AppState>, cmd: &str, a: Args) -> Result<V
         "import_start" => ok(api::import_start(st, a.get("lists")?).await?),
         "import_create" => ok(api::import_create(st, a.get("options")?).await?),
         "import_status" => ok(api::import_status().await?),
+        // Recently played's grid of the albums/playlists you played from (both apps).
+        "recent_play_contexts" => ok(encore_core::polish::context::recent_play_contexts(&st.db, a.get("limit")?)),
+        // First-run import offer: one rule for both apps (`library::import_offer`).
+        "import_offer" => ok(encore_core::library::import_offer_db(&st.db)),
+        "import_offer_done" => ok(encore_core::library::import_offer_done(&st.db)),
         // stream: ios-import-review: the review step (To check / Not found / Matched).
         "import_rows" => ok(api::import_rows(a.get("tier")?).await?),
         "import_pick" => ok(api::import_pick(st, a.get("key")?, a.get("song")?).await?),

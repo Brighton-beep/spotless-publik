@@ -123,7 +123,7 @@ final class FeatureContractTests: XCTestCase {
         // Matching ends in review (stream ios-import-review); Create writes and finishes.
         let review = try await core.importStatus()
         XCTAssertEqual(review?.phase, "review")
-        try await core.importCreate()
+        try await core.importCreate(names: [:], local: true)
         let done = try await core.importStatus()
         XCTAssertEqual(done?.phase, "done")
         XCTAssertEqual(done?.results.count, 2)

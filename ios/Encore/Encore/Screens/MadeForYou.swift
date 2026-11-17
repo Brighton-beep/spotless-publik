@@ -75,8 +75,8 @@ struct MadeForYouView: View {
                     }
                 }
                 shelf("Your Mixes", items([.daily]))
-                shelf("Discover something new", items([.discoverWeekly, .releaseRadar]))
-                shelf("Your top mixes", items([.onRepeat, .repeatRewind]))
+                shelf("Discover new music", items([.discoverWeekly, .releaseRadar]))
+                shelf("Unique for you", items([.onRepeat, .repeatRewind]))
                 Text("Made for you updates on its own: Your Mixes every day, Weekly Discoveries on Mondays, New Release Mix on Fridays.")
                     .font(Typo.meta).foregroundStyle(Palette.subdued)
                     .padding(.horizontal, Space.gutter)

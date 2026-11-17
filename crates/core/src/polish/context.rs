@@ -332,6 +332,25 @@ pub fn recorded(db: &Db, limit: usize) -> Vec<(PlayContext, i64, i64)> {
     })
 }
 
+/// One played-from context on the Recently played page (both apps): the context, how often and
+/// when it was last played from.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentPlayContext {
+    #[serde(flatten)]
+    pub context: PlayContext,
+    pub plays: i64,
+    pub played_at: i64,
+}
+
+/// The Recently played page's grid (`recent_play_contexts`): [`recorded`], newest first.
+pub fn recent_play_contexts(db: &Db, limit: Option<usize>) -> Vec<RecentPlayContext> {
+    recorded(db, limit.unwrap_or(50))
+        .into_iter()
+        .map(|(context, plays, played_at)| RecentPlayContext { context, plays, played_at })
+        .collect()
+}
+
 /// Home's contexts (Recent shortcuts, Jump back in): the recorded ones, plus album/artist contexts
 /// derived (smart `contexts`) only for songs whose latest listen had no recorded context, merged
 /// and most recent first. Liked Songs is left out: Home pins it as its own first shortcut.
