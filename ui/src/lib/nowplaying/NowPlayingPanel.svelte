@@ -163,7 +163,7 @@
 			{#if next}
 				<div class="rounded-lg bg-bg-highlight p-4">
 					<div class="flex items-center justify-between gap-2 pb-2">
-						<h3 class="text-base font-bold text-white">Next in queue</h3>
+						<h3 class="text-base font-bold text-white">{next.reason ? 'Next up' : 'Next in queue'}</h3>
 						<button
 							type="button"
 							class="text-sm font-bold text-text-subdued hover:text-white hover:underline"
@@ -173,6 +173,7 @@
 					<div class="-mx-2" role="grid" aria-label="Next in queue">
 						<QueueRow
 							song={next}
+							reason={next.reason}
 							skip={playback.queue.skipReasons?.[next.video_id]}
 							onplay={() => api.playIndex(nextIndex)}
 							onmenu={(e) => openTrackMenu(e, [next], { queueIndex: nextIndex })}

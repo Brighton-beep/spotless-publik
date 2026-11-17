@@ -11,7 +11,7 @@
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import * as api from '$lib/api';
 	import type { BrowseItem, SearchOverview, SearchSuggestions, SongItem } from '$lib/api';
-	import { auth, noteSearch, personal, forgetSearch } from '$lib/player.svelte';
+	import { auth, noteSearch } from '$lib/player.svelte';
 	import { asSong, openItem } from '$lib/browse';
 	// ── lane magic-d6 ── the dropdown's entity recents and inline + / Follow (MAGIC-GAPS #18).
 	import { addRecent, recentSearches, removeRecent, type RecentItem } from '$lib/discover/recents.svelte';
@@ -38,7 +38,6 @@
 	import XIcon from 'phosphor-svelte/lib/XIcon';
 	import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
 	import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
-	import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
 	import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 	import { searchFocus } from './search.svelte';
 	import { openProfileMenu } from '$lib/settings/profileMenu';
@@ -221,11 +220,10 @@
 		if (q && ovFor !== q) loadResults(q);
 	}
 
-	// Spotify's focused-empty dropdown lists the things you opened from search (with their art and
-	// type), not what you typed. Plain queries only stand in until there is a first entity.
+	// The focused-empty dropdown lists the things you opened from search (with their art and type),
+	// never what you typed: the same recent searches as /search and the iPhone.
 	const recentItems = $derived(recentSearches.items.slice(0, 8));
-	const recent = $derived(recentItems.length ? [] : personal.searches.slice(0, 8));
-	const showRecent = $derived(focused && !value.trim() && (recentItems.length > 0 || recent.length > 0));
+	const showRecent = $derived(focused && !value.trim() && recentItems.length > 0);
 	// Typing: never an empty overlay. Completions on top, then skeleton rows until this query's
 	// results arrive (the overview is never empty: a correction, the library or "Try these" stand
 	// in); if the search itself failed, the typed text as a row that opens the results page.
@@ -256,10 +254,7 @@
 	});
 	const rows = $derived<Row[]>(
 		showRecent
-			? [
-					...recentItems.map((item) => ({ kind: 'recent' as const, item })),
-					...recent.map((text) => ({ kind: 'query' as const, text }))
-				]
+			? recentItems.map((item) => ({ kind: 'recent' as const, item }))
 			: showSuggest
 				? [...queryRows, ...entityRows]
 				: []
@@ -330,8 +325,7 @@
 			e.preventDefault();
 		} else if (e.key === 'Delete' && showRecent && active >= 0 && rows[active]) {
 			const r = rows[active];
-			if (r.kind === 'query') forgetSearch(r.text);
-			else if (r.kind === 'recent') removeRecent(r.item.id);
+			if (r.kind === 'recent') removeRecent(r.item.id);
 			active = Math.min(active, rows.length - 2);
 			e.preventDefault();
 		} else if (e.key === 'Enter') {
@@ -560,6 +554,7 @@
 							<div role="presentation" class="px-3 pt-2 pb-1 text-sm text-text-subdued">{note}</div>
 						{/if}
 						{#if r.kind === 'query'}
+							{@const [b, rest] = split(r.text)}
 							<div
 								role="option"
 								id="search-opt-{i}"
@@ -573,27 +568,10 @@
 									pick(r);
 								}}
 							>
-								<Icon icon={showRecent ? ClockCounterClockwiseIcon : MagnifyingGlassIcon} size={24} class="text-text-subdued" />
+								<Icon icon={MagnifyingGlassIcon} size={24} class="text-text-subdued" />
 								<span class="min-w-0 flex-1 truncate text-white">
-									{#if showRecent}{r.text}{:else}{@const [b, rest] = split(r.text)}<span class="font-bold">{b}</span>{rest}{/if}
+									<span class="font-bold">{b}</span>{rest}
 								</span>
-								{#if showRecent}
-									<!-- a11y: pointer-only; from the keyboard, Delete removes the highlighted recent. -->
-									<button
-										type="button"
-										aria-label="Remove"
-										aria-hidden="true"
-										tabindex="-1"
-										class="text-text-subdued opacity-0 group-hover/row:opacity-100 hover:text-white"
-										onmousedown={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											forgetSearch(r.text);
-										}}
-									>
-										<Icon icon={XIcon} size={16} />
-									</button>
-								{/if}
 							</div>
 						{:else}
 							{@const it = look(r)}

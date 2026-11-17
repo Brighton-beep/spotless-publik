@@ -217,7 +217,8 @@ pub struct InnerTube {
     /// write the rotated cookie back to disk. See [`InnerTube::absorb_cookies`].
     cookie_changed: Arc<Notify>,
     /// Where `post` sends to: [`BASE_URL`], except in tests, which point it at a local server.
-    base_url: String,
+    /// Shared by every clone, so a test can redirect an `InnerTube` already inside an `AppState`.
+    base_url: Arc<RwLock<String>>,
     // ── stream: reliability ──
     /// Admission control: in-flight cap, background pacing. See [`crate::reliability`].
     gate: Arc<Gate>,
@@ -258,7 +259,7 @@ impl InnerTube {
             session_rejected: Arc::new(Notify::new()),
             heal: Arc::new(watch::Sender::new(HealState::default())),
             cookie_changed: Arc::new(Notify::new()),
-            base_url: BASE_URL.to_owned(),
+            base_url: Arc::new(RwLock::new(BASE_URL.to_owned())),
             gate: Arc::new(Gate::new(Limits::default())),
             cache: Arc::new(ResponseCache::default()),
             stats: Arc::new(Stats::default()),
@@ -335,10 +336,10 @@ impl InnerTube {
     }
     // ── end stream: reliability ──
 
-    /// Point `post` somewhere else (a local test server).
-    #[cfg(test)]
-    pub(crate) fn set_base_url(&mut self, url: &str) {
-        self.base_url = url.to_owned();
+    /// Point `post` (this handle and every clone of it) somewhere else: a local test server.
+    #[cfg(any(test, feature = "test-util"))]
+    pub fn set_base_url(&self, url: &str) {
+        *self.base_url.write().unwrap() = url.to_owned();
     }
 
     /// Signal raised when YouTube rejects the signed-in session. See the field.
@@ -600,7 +601,7 @@ impl InnerTube {
     ) -> Result<serde_json::Value, Error> {
         // `path` may already carry query params (e.g. browse continuations); chain accordingly.
         let sep = if path.contains('?') { '&' } else { '?' };
-        let url = format!("{}{path}{sep}prettyPrint=false", self.base_url);
+        let url = format!("{}{path}{sep}prettyPrint=false", self.base_url.read().unwrap());
         let body = serde_json::to_vec(body)?;
 
         // ── stream: reliability ── identical reads share one request; anonymous ones are kept.
@@ -1313,7 +1314,7 @@ mod tests {
             let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
             format!("http://{}/youtubei/v1/", l.local_addr().unwrap())
         };
-        let mut it = signed_in_against(&ok);
+        let it = signed_in_against(&ok);
         it.set_base_url(&dead);
         let got = it.post_write("comment/x", web, &serde_json::json!({}), true).await;
         assert!(matches!(got, Err(Error::Http(_))), "a connect failure sent nothing: {got:?}");
@@ -1498,7 +1499,7 @@ mod tests {
             data_sync_id: Some("fixture-dsid".into()),
             ..Default::default()
         };
-        let mut it = InnerTube::new(session, None).unwrap();
+        let it = InnerTube::new(session, None).unwrap();
         it.set_base_url(&server.base_url);
         it
     }
@@ -1550,7 +1551,7 @@ mod tests {
     const SORRY: &str = "<html><title>Sorry...</title>automated queries</html>";
 
     fn anonymous_against(server: &crate::test_server::MockServer) -> InnerTube {
-        let mut it = InnerTube::new(Session::default(), None).unwrap();
+        let it = InnerTube::new(Session::default(), None).unwrap();
         it.set_base_url(&server.base_url);
         it
     }

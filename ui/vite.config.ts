@@ -6,7 +6,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	server: {
 		port: 5183,
-		strictPort: true
+		strictPort: true,
+		// The Browse tile colours live in the core, one list for both apps (discover/data.ts).
+		fs: { allow: ['.', '../crates/core/browse_tiles.json'] }
 	},
 	plugins: [
 		{

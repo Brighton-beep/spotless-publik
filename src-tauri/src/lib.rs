@@ -154,8 +154,8 @@ fn tune_webview(win: &tauri::WebviewWindow, media: bool) {
             // Two-finger swipe to go back (#302). WebKit walks its own back/forward list, which
             // for this SPA is SvelteKit's pushState entries: the same ones the titlebar's back
             // button steps through. It only fires once a horizontal scroller has run out, so the
-            // shelves keep their swipes. Windows has this on by default; macOS would need
-            // WKWebView's allowsBackForwardNavigationGestures, which wry does not expose.
+            // shelves keep their swipes. Windows has this on by default; macOS sets
+            // WKWebView's allowsBackForwardNavigationGestures (`enable_swipe_navigation`).
             settings.set_enable_back_forward_navigation_gestures(true);
 
             if compositor_features_off(&settings) {
@@ -338,6 +338,25 @@ pub(crate) fn set_webgl(app: &tauri::AppHandle, on: bool) {
             }
         });
     }
+}
+
+/// Two-finger swipe back/forward on macOS (#302), the Linux switch in [`tune_webview`]. WKWebView
+/// walks its own back/forward list, which for this SPA is SvelteKit's pushState entries, so a swipe
+/// is a `popstate` exactly like the titlebar's back button. The gesture only starts when the wheel
+/// event begins on content that is already at that edge, so a shelf mid-scroll keeps its swipe.
+/// wry does not expose `allowsBackForwardNavigationGestures`, so it is set through the objc runtime.
+#[cfg(target_os = "macos")]
+fn enable_swipe_navigation(win: &tauri::WebviewWindow) {
+    let _ = win.with_webview(|wv| {
+        let view = wv.inner() as *mut objc2::runtime::AnyObject;
+        if view.is_null() {
+            return;
+        }
+        // SAFETY: `inner()` is the live WKWebView; with_webview runs on the main thread.
+        unsafe {
+            let _: () = objc2::msg_send![&*view, setAllowsBackForwardNavigationGestures: objc2::runtime::Bool::YES];
+        }
+    });
 }
 
 /// [`tune_webview`] for a window looked up by label. No-op if it isn't up.
@@ -1079,6 +1098,10 @@ pub fn run() {
                 }
             }
 
+            #[cfg(target_os = "macos")]
+            if let Some(w) = app.get_webview_window("main") {
+                enable_swipe_navigation(&w);
+            }
             #[cfg(target_os = "linux")]
             {
                 tune_webview_labelled(app.handle(), "main", true);
@@ -1227,6 +1250,7 @@ pub fn run() {
             commands::switch_account,
             commands::sign_out,
             commands::login_webview,
+            commands::cancel_login,
             commands::get_google_accounts,
             commands::switch_google_account,
             commands::remove_google_account,

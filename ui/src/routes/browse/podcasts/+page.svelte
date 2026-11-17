@@ -8,7 +8,7 @@
 	import { goto } from '$app/navigation';
 	import BrowseHeader from '$lib/discover/BrowseHeader.svelte';
 	import EpisodeCard from '$lib/discover/EpisodeCard.svelte';
-	import { chartsKey, loadCharts, peek } from '$lib/discover/data';
+	import { TILE, chartsKey, loadCharts, peek } from '$lib/discover/data';
 	import { exploreHref, isPlaying, playBrowse, toggle } from '$lib/discover/play.svelte';
 
 	let charts = $state<ChartsPage | null>(peek<ChartsPage>(chartsKey()));
@@ -29,7 +29,7 @@
 </script>
 
 <div class="relative isolate min-h-full pb-10">
-	<BrowseHeader title="Podcasts" color="#006450" eyebrow="Browse" />
+	<BrowseHeader title="Podcasts" color={TILE.podcasts} eyebrow="Browse" />
 	<div class="flex flex-col gap-8 px-[var(--content-spacing)]">
 		{#if podcasts.follows.length}
 			<Shelf title="Your shows" items={podcasts.follows} href="/list?podcasts=shows&title=Your%20shows">

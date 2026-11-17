@@ -43,6 +43,7 @@
 	import ResizeHandle from '$lib/shell/ResizeHandle.svelte';
 	import LibrarySidebar from '$lib/shell/LibrarySidebar.svelte';
 	import GlobalBanners from '$lib/settings/GlobalBanners.svelte';
+	import SignInSheet from '$lib/settings/SignInSheet.svelte';
 	import {
 		leftPx,
 		leftRail,
@@ -341,6 +342,7 @@
 		{/if}
 		{#if mounted.channel}{#await lazyDialogs.channel() then m}<m.default />{/await}{/if}
 		<LinkDialog />
+		<SignInSheet />
 		{#if mounted.import}{#await lazyDialogs.import() then m}<m.default />{/await}{/if}
 		<AboutRecommendations />
 		<MenuHost />

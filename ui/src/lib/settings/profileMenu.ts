@@ -3,7 +3,7 @@
 // sign-in is an optional extra at the bottom. Stream p-settings owns the content; TopBar opens it.
 import { goto } from '$app/navigation';
 import * as api from '$lib/api';
-import { auth } from '$lib/player.svelte';
+import { auth, startSignIn } from '$lib/player.svelte';
 import { lib } from '$lib/library.svelte';
 import { openMenu, type MenuEntry, type MenuTarget } from '$lib/kit/menus';
 import { goSettings, importFromSpotify, togglePrivateSession } from './actions';
@@ -20,7 +20,7 @@ export function profileMenuEntries(): MenuEntry[] {
 		{ type: 'separator' },
 		account?.signedIn
 			? { label: 'Sign out of YouTube Music', onSelect: () => api.signOut() }
-			: { label: 'Sign in to YouTube Music', hint: '↗', onSelect: () => api.loginWebview() }
+			: { label: 'Sign in to YouTube Music', onSelect: () => startSignIn() }
 	];
 }
 

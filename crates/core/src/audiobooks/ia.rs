@@ -10,18 +10,18 @@ const FIELDS: [&str; 6] = ["identifier", "title", "creator", "runtime", "languag
 
 /// Genre shelves and tiles: (IA subject, label, tile colour).
 pub const GENRES: [(&str, &str, &str); 12] = [
-    ("mystery", "Mystery", "#8c1932"),
-    ("romance", "Romance", "#e8115b"),
-    ("adventure", "Adventure", "#27856a"),
-    ("science fiction", "Science fiction", "#0d73ec"),
-    ("fantasy", "Fantasy", "#8400e7"),
-    ("horror", "Horror", "#503750"),
-    ("children", "Kids", "#e13300"),
-    ("humor", "Comedy", "#dc148c"),
-    ("history", "History", "#ba5d07"),
-    ("biography", "Biography", "#477d95"),
-    ("philosophy", "Philosophy", "#1e3264"),
-    ("poetry", "Poetry", "#148a08"),
+    ("mystery", "Mystery", "#be123c"),
+    ("romance", "Romance", "#15803d"),
+    ("adventure", "Adventure", "#9d2bb0"),
+    ("science fiction", "Science fiction", "#0e6ba8"),
+    ("fantasy", "Fantasy", "#a16207"),
+    ("horror", "Horror", "#3f7d20"),
+    ("children", "Kids", "#b0279f"),
+    ("humor", "Comedy", "#d6246e"),
+    ("history", "History", "#0b7a75"),
+    ("biography", "Biography", "#6a2fd8"),
+    ("philosophy", "Philosophy", "#1f4fa8"),
+    ("poetry", "Poetry", "#c2410c"),
 ];
 
 pub fn genre_label(subject: &str) -> Option<&'static str> {

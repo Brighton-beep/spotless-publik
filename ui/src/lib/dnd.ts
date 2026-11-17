@@ -6,7 +6,7 @@
 import type { BrowseItem, SongItem } from './api';
 
 export const ITEM_MIME = 'application/x-limusic-item';
-/** A queue row being dragged to a new position (`QueueList`), carrying its queue index. */
+/** A queue row being dragged to a new position (`QueuePanel`), carrying its queue index. */
 export const QUEUE_ROW_MIME = 'application/x-limusic-queue-row';
 /** A playlist row being dragged to a new position (playlist page). */
 export const PLAYLIST_ROW_MIME = 'application/x-limusic-playlist-row';

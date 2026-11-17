@@ -14,7 +14,7 @@ use tauri::webview::cookie::Cookie;
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-use crate::state::{AppState, SignInOutcome};
+use crate::state::AppState;
 
 const LOGIN_LABEL: &str = "login";
 /// The hidden twin of [`LOGIN_LABEL`], used by [`refresh_session`]. Its own label so a refresh can
@@ -46,63 +46,50 @@ const LOGIN_UA: Option<&str> = Some(
 #[cfg(target_os = "windows")]
 const LOGIN_UA: Option<&str> = None;
 
-/// Google sign-in with `continue` back to YTM, so a successful login redirects to music.youtube.com
-/// (our completion signal).
-const LOGIN_URL: &str =
-    "https://accounts.google.com/ServiceLogin?service=youtube&continue=https://music.youtube.com/";
+/// YouTube's own sign-in hand-off: the page Google's login continues to, which turns the Google
+/// session into youtube.com cookies (SAPISID) and then goes on to YouTube Music. Continuing to
+/// music.youtube.com directly could land the user on YTM still signed out, with its own "Sign in"
+/// button to press a second time.
+const YOUTUBE_HANDOFF_URL: &str = "https://www.youtube.com/signin?action_handle_signin=true&app=desktop&next=https%3A%2F%2Fmusic.youtube.com%2F";
+
+/// What YouTube Music's own "Sign in" button opens (taken from the page's `SIGNIN_URL`): Google's
+/// login, continuing through [`YOUTUBE_HANDOFF_URL`].
+const LOGIN_URL: &str = "https://accounts.google.com/ServiceLogin?ltmpl=music&service=youtube&uilel=3&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26next%3Dhttps%253A%252F%252Fmusic.youtube.com%252F";
 
 /// Google's own "Add account" entry point. Unlike ServiceLogin it presents the fresh sign-in
 /// screen rather than continuing straight through on an existing session, which is what lets a
-/// second account be added.
-const ADD_ACCOUNT_URL: &str =
-    "https://accounts.google.com/AddSession?service=youtube&continue=https://music.youtube.com/";
+/// second account be added. Same hand-off as [`LOGIN_URL`].
+const ADD_ACCOUNT_URL: &str = "https://accounts.google.com/AddSession?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26next%3Dhttps%253A%252F%252Fmusic.youtube.com%252F";
 
-/// Open the login webview. Returns immediately; sign-in completes asynchronously (the UI learns via
-/// the `auth-changed` event, or `login-error` on failure). `add_account` picks the AddSession
-/// flow so an additional Google account can be added while another is signed in.
+/// Set once the sign-in window has been sent through [`YOUTUBE_HANDOFF_URL`] by hand, so a
+/// hand-off that doesn't take is not repeated every second. Reset when a window opens.
+static HANDED_OFF: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Size of the sign-in window, in logical pixels.
+const LOGIN_SIZE: (f64, f64) = (480.0, 680.0);
+
+/// Open the sign-in window, or bring it forward if it is already open. Returns immediately: the
+/// sign-in finishes in [`encore_core::login::capture`], which tells the UI through `login-done`,
+/// `login-error` or `login-cancelled` (plus `auth-changed` from the sign-in itself). `add_account`
+/// picks the AddSession flow so an additional Google account can be added while another is
+/// signed in.
+///
+/// A window attached to the main one rather than a webview inside it: a second webview in the main
+/// window makes `get_webview_window("main")` return `None` for as long as it is there (Tauri only
+/// calls a window a webview window while it holds exactly one), which would break the tray, the
+/// mini player and everything else that looks the main window up, and it needs Tauri's
+/// `unstable` feature. The attached window moves with the main one, stays above it, has no Dock or
+/// taskbar entry, and the main window shows a "Signing in" sheet behind it with Cancel.
 pub fn open_login(app: AppHandle, state: Arc<AppState>, add_account: bool) {
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<()>();
-
-    // When the webview lands on music.youtube.com, capture cookies + sign in. Runs off the
-    // event-handler thread because reading the cookie store can deadlock when called synchronously
-    // from inside a page-load callback.
-    {
-        let app = app.clone();
-        tauri::async_runtime::spawn(async move {
-            while rx.recv().await.is_some() {
-                // The redirect that lands us here sets the youtube cookies; they may appear a beat
-                // after the page finishes, so poll briefly.
-                for _ in 0..6 {
-                    let cookie = read_login_cookies(&app, LOGIN_LABEL).await;
-                    if innertube::cookie_sapisid(&cookie).is_some() {
-                        match state.sign_in(cookie, None).await {
-                            Ok(SignInOutcome::Complete) => {
-                                let _ = app.emit("login-done", ());
-                            }
-                            // The authenticated cookie is saved, but the account remains
-                            // deliberately unfinished until the main-window picker selects a
-                            // server-issued delegated identity.
-                            Ok(SignInOutcome::SelectionRequired) => {}
-                            Err(e) => {
-                                let _ = app.emit("login-error", e);
-                            }
-                        }
-                        close_login(&app);
-                        return;
-                    }
-                    tokio::time::sleep(Duration::from_millis(500)).await;
-                }
-                // Landed on music.youtube.com but not authenticated yet — keep watching.
-            }
-        });
-    }
-
     // Window creation must happen on the main thread (GTK).
     let app2 = app.clone();
     let dispatched = app.run_on_main_thread(move || {
-        // Reclaim the label if a prior login window is still around.
+        // Already open: bring it back rather than building a second one under the same label.
         if let Some(w) = app2.get_webview_window(LOGIN_LABEL) {
-            let _ = w.destroy();
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_focus();
+            return;
         }
         // Add-account flow: sign the *webview* out of Google first, so the fresh sign-in is the
         // webview's only session and music.youtube.com lands on the new account instead of
@@ -115,24 +102,67 @@ pub fn open_login(app: AppHandle, state: Arc<AppState>, add_account: bool) {
                 return;
             }
         }
+        HANDED_OFF.store(false, std::sync::atomic::Ordering::SeqCst);
         let url = if add_account { ADD_ACCOUNT_URL } else { LOGIN_URL };
         let Ok(url) = tauri::Url::parse(url) else { return };
+        // Every page load and navigation wakes the cookie poll, so a finished login is seen at
+        // once rather than at the next tick.
+        let (tx, nudge) = tokio::sync::mpsc::unbounded_channel::<()>();
+        let tx2 = tx.clone();
         let builder = WebviewWindowBuilder::new(&app2, LOGIN_LABEL, WebviewUrl::External(url))
-            .title("Sign in to YouTube Music")
-            .inner_size(480.0, 720.0)
-            .on_page_load(move |_w, payload| {
-                if matches!(payload.event(), PageLoadEvent::Finished)
-                    && payload.url().host_str() == Some("music.youtube.com")
-                {
-                    let _ = tx.send(());
-                }
+            .title("Sign in to YouTube Music · Spotless")
+            .inner_size(LOGIN_SIZE.0, LOGIN_SIZE.1)
+            .skip_taskbar(true)
+            .minimizable(false)
+            .on_page_load(move |_w, _payload| {
+                let _ = tx.send(());
+            })
+            .on_navigation(move |_url| {
+                let _ = tx2.send(());
+                true
             });
         let builder = match LOGIN_UA {
             Some(ua) => builder.user_agent(ua),
             None => builder,
         };
+        let main = app2.get_webview_window("main").filter(|m| m.is_visible().unwrap_or(false));
+        let builder = match main {
+            Some(main) => {
+                let builder = match centred_on(&main) {
+                    Some((x, y)) => builder.position(x, y),
+                    None => builder.center(),
+                };
+                match builder.parent(&main) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        let _ = app2
+                            .emit("login-error", format!("Couldn't open the sign-in window: {e}"));
+                        return;
+                    }
+                }
+            }
+            None => builder.center(),
+        };
         match crate::http::proxied(builder).build() {
-            Ok(win) => no_webgl(&win),
+            Ok(win) => {
+                no_webgl(&win);
+                let app = app2.clone();
+                tauri::async_runtime::spawn(async move {
+                    let mut nudge = nudge;
+                    let end = encore_core::login::capture(
+                        &state,
+                        || read_login_jar(&app),
+                        &mut nudge,
+                        encore_core::login::POLL,
+                        encore_core::login::TIMEOUT,
+                    )
+                    .await;
+                    tracing::info!(?end, "sign-in window finished");
+                    // Also after a manual close (`Cancelled`): nothing left to close, but the
+                    // main window still needs its focus back.
+                    close_login(&app);
+                });
+            }
             Err(e) => {
                 let _ = app2.emit("login-error", format!("Couldn't open the sign-in window: {e}"));
             }
@@ -141,6 +171,81 @@ pub fn open_login(app: AppHandle, state: Arc<AppState>, add_account: bool) {
     if let Err(e) = dispatched {
         let _ = app.emit("login-error", format!("Couldn't open the sign-in window: {e}"));
     }
+}
+
+/// Close the sign-in window (the main window's Cancel). The capture sees it gone and reports
+/// `login-cancelled`.
+pub fn cancel_login(app: &AppHandle) {
+    close_login(app);
+}
+
+/// Top-left corner that centres the sign-in window over the main window, in logical pixels.
+fn centred_on(main: &tauri::WebviewWindow) -> Option<(f64, f64)> {
+    let scale = main.scale_factor().ok()?;
+    let pos = main.outer_position().ok()?.to_logical::<f64>(scale);
+    let size = main.outer_size().ok()?.to_logical::<f64>(scale);
+    let x = pos.x + (size.width - LOGIN_SIZE.0) / 2.0;
+    // A little above centre, below the title bar: where a sheet sits.
+    let y = pos.y + ((size.height - LOGIN_SIZE.1) / 3.0).max(28.0);
+    Some((x, y))
+}
+
+/// The sign-in window's youtube.com `Cookie` header, or `None` once the window is gone. Empty
+/// while it is off Google's and YouTube's own pages: nothing it does there can sign us in.
+///
+/// If the window sits on YouTube Music signed out while Google already has the user signed in
+/// (a login flow that skipped YouTube's hand-off), it is sent through the hand-off once, so the
+/// user never has to press YTM's own "Sign in".
+async fn read_login_jar(app: &AppHandle) -> Option<String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let app2 = app.clone();
+    app.run_on_main_thread(move || {
+        let jar = app2.get_webview_window(LOGIN_LABEL).map(|wv| {
+            let url = wv.url().ok();
+            let host = url.as_ref().and_then(|u| u.host_str()).unwrap_or_default().to_owned();
+            if !is_google_host(&host) {
+                return String::new();
+            }
+            let cookies = match wv.cookies() {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::debug!(error = %e, "could not read the sign-in window's cookies");
+                    return String::new();
+                }
+            };
+            let jar = youtube_cookie_header(cookies.clone());
+            if needs_youtube_handoff(&host, &cookies, &jar)
+                && !HANDED_OFF.swap(true, std::sync::atomic::Ordering::SeqCst)
+            {
+                if let Ok(to) = tauri::Url::parse(YOUTUBE_HANDOFF_URL) {
+                    tracing::info!("signed in to Google but not YouTube; handing off");
+                    let _ = wv.navigate(to);
+                }
+            }
+            jar
+        });
+        let _ = tx.send(jar);
+    })
+    .ok()?;
+    rx.await.ok()?
+}
+
+/// On YouTube Music, with a Google session in the jar but no YouTube one.
+fn needs_youtube_handoff(host: &str, cookies: &[Cookie<'static>], youtube_jar: &str) -> bool {
+    let google_session = cookies.iter().any(|c| {
+        let domain = c.domain().unwrap_or_default().trim_start_matches('.');
+        (domain == "google.com" || domain.ends_with(".google.com"))
+            && matches!(c.name(), "SID" | "__Secure-1PSID" | "__Secure-3PSID")
+    });
+    host == "music.youtube.com"
+        && google_session
+        && innertube::cookie_sapisid(youtube_jar).is_none()
+}
+
+fn is_google_host(host: &str) -> bool {
+    ["google.com", "youtube.com"]
+        .iter()
+        .any(|d| host == *d || host.strip_suffix(d).is_some_and(|h| h.ends_with('.')))
 }
 
 /// WebGL off in the Google webviews, as it already is in the main window (`tune_webview`).
@@ -324,7 +429,8 @@ async fn read_login_cookies(app: &AppHandle, label: &'static str) -> String {
     let app2 = app.clone();
     if app
         .run_on_main_thread(move || {
-            let _ = tx.send(youtube_cookies(&app2, label));
+            let jar = app2.get_webview_window(label).map(|wv| jar_of(&wv)).unwrap_or_default();
+            let _ = tx.send(jar);
         })
         .is_err()
     {
@@ -333,10 +439,15 @@ async fn read_login_cookies(app: &AppHandle, label: &'static str) -> String {
     rx.await.unwrap_or_default()
 }
 
-fn youtube_cookies(app: &AppHandle, label: &str) -> String {
-    let Some(wv) = app.get_webview_window(label) else { return String::new() };
-    let Ok(cookies) = wv.cookies() else { return String::new() };
-    youtube_cookie_header(cookies)
+/// Main thread only (see [`read_login_cookies`]).
+fn jar_of(wv: &tauri::WebviewWindow) -> String {
+    match wv.cookies() {
+        Ok(cookies) => youtube_cookie_header(cookies),
+        Err(e) => {
+            tracing::debug!(label = wv.label(), error = %e, "could not read the webview's cookies");
+            String::new()
+        }
+    }
 }
 
 /// Domain-match by hand rather than with `cookies_for_url`: WKWebView's implementation compares the
@@ -401,10 +512,61 @@ mod tests {
         assert!(same_jar("SAPISID=a; SID=b", "SID=b; SAPISID=a"));
         assert!(!same_jar("SAPISID=a; __Secure-3PSIDTS=new", "SAPISID=a; __Secure-3PSIDTS=old"));
     }
+
+    #[test]
+    fn a_signed_out_ytm_with_a_google_session_is_handed_off() {
+        let google = vec![cookie("SID=g; Domain=.google.com"), cookie("NID=n; Domain=.google.com")];
+        assert!(needs_youtube_handoff("music.youtube.com", &google, "PREF=x"));
+        // YouTube already has its session: nothing to do.
+        assert!(!needs_youtube_handoff("music.youtube.com", &google, "SAPISID=a; PREF=x"));
+        // Not signed in to Google yet: the user is still logging in.
+        let anon = vec![cookie("NID=n; Domain=.google.com")];
+        assert!(!needs_youtube_handoff("music.youtube.com", &anon, "PREF=x"));
+        // Still on Google's pages.
+        assert!(!needs_youtube_handoff("accounts.google.com", &google, "PREF=x"));
+    }
+
+    #[test]
+    fn the_login_continues_through_youtubes_own_hand_off() {
+        for url in [LOGIN_URL, ADD_ACCOUNT_URL] {
+            let url = tauri::Url::parse(url).unwrap();
+            let next = url.query_pairs().find(|(k, _)| k == "continue").unwrap().1.into_owned();
+            assert_eq!(next, YOUTUBE_HANDOFF_URL);
+            let next = tauri::Url::parse(&next).unwrap();
+            assert_eq!(next.host_str(), Some("www.youtube.com"));
+            let to = next.query_pairs().find(|(k, _)| k == "next").unwrap().1.into_owned();
+            assert_eq!(to, "https://music.youtube.com/");
+        }
+    }
+
+    #[test]
+    fn only_google_and_youtube_pages_are_read() {
+        for host in ["accounts.google.com", "google.com", "music.youtube.com", "youtube.com"] {
+            assert!(is_google_host(host), "{host}");
+        }
+        for host in ["notgoogle.com", "google.com.evil.example", "support.example.org"] {
+            assert!(!is_google_host(host), "{host}");
+        }
+    }
 }
 
+/// Close the sign-in window and hand focus back to the main window: macOS otherwise activates
+/// whichever app was in front before, as if Spotless had been left.
 fn close_login(app: &AppHandle) {
-    close(app, LOGIN_LABEL)
+    close(app, LOGIN_LABEL);
+    // After the window is really gone: macOS picks the next active app once the destroy lands.
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let app2 = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(main) =
+                app2.get_webview_window("main").filter(|m| m.is_visible().unwrap_or(false))
+            {
+                let _ = main.set_focus();
+            }
+        });
+    });
 }
 
 fn close(app: &AppHandle, label: &'static str) {

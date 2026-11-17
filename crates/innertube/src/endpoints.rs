@@ -1833,7 +1833,7 @@ mod tests {
             visitor_data: Some("fixture-visitor".into()),
             ..Default::default()
         };
-        let mut it = InnerTube::new(session, None).unwrap();
+        let it = InnerTube::new(session, None).unwrap();
         it.set_base_url(&server.base_url);
         it
     }

@@ -7,6 +7,7 @@
 	import type { Shelf as HomeShelf } from '$lib/api';
 	import { EmptyState, ErrorState, Skeleton } from '$lib/kit';
 	import BrowseHeader from '$lib/discover/BrowseHeader.svelte';
+	import { TILE } from '$lib/discover/data';
 	import { getCached, putCached } from '$lib/pagecache';
 	import { audiobookGenre, audiobookHome, type Audiobook } from '$lib/audiobooks.svelte';
 	import AudiobookShelves from '$lib/audiobooks/AudiobookShelves.svelte';
@@ -45,7 +46,7 @@
 <svelte:head><title>{title}</title></svelte:head>
 
 <div class="relative isolate min-h-full pb-10">
-	<BrowseHeader {title} color="#b0461e" eyebrow={genre ? 'Audiobooks' : 'Browse'} />
+	<BrowseHeader {title} color={TILE.audiobooks} eyebrow={genre ? 'Audiobooks' : 'Browse'} />
 	<div class="flex flex-col gap-8 px-[var(--content-spacing)]">
 		{#if genre}
 			{#if grid?.length}

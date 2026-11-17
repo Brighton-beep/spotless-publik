@@ -16,7 +16,7 @@
 	import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
 	import BrowseHeader from '$lib/discover/BrowseHeader.svelte';
 	import ExploreCard from '$lib/discover/ExploreCard.svelte';
-	import { chartsKey, loadCharts, peek } from '$lib/discover/data';
+	import { TILE, chartsKey, loadCharts, peek } from '$lib/discover/data';
 	import { exploreHref, isPlaying, playBrowse, toggle } from '$lib/discover/play.svelte';
 
 	let country = $state<string | undefined>(undefined);
@@ -75,7 +75,7 @@
 {/snippet}
 
 <div class="relative isolate min-h-full pb-10">
-	<BrowseHeader title="Charts" color="#8d67ab" eyebrow="Browse">
+	<BrowseHeader title="Charts" color={TILE.charts} eyebrow="Browse">
 		{#if data?.countries.length}
 			<Pill variant="outline" icon={GlobeIcon} onclick={pickCountry}>{data.country?.name ?? 'Global'}</Pill>
 		{/if}

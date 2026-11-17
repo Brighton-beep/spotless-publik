@@ -1,9 +1,9 @@
 <script lang="ts">
 	/**
 	 * Browse ▸ Made for you (stream smart2), Spotify's "Made for you" category page: a 96/800 title
-	 * on the plain dark panel (no wash, no kicker), then fixed 4-card grid shelves in Spotify's
-	 * order: "Unique for you" (Your Rotation, Throwback Mix), "Your Mixes", "Discover new music"
-	 * (New Release Mix, Weekly Discoveries). Cards open the playlist pages; the accent button plays.
+	 * on the plain dark panel (no wash, no kicker), then fixed 4-card grid shelves, in the same order
+	 * and with the same titles as the iPhone: "Your Mixes", "Discover new music" (New Release Mix,
+	 * Weekly Discoveries), "Unique for you" (Your Rotation, Throwback Mix). Cards open the playlist pages; the accent button plays.
 	 * Measured (parity3): title top 123px below the panel top, first shelf heading 325px (h2 box).
 	 */
 	import { onMount } from 'svelte';
@@ -37,9 +37,9 @@
 		kinds.flatMap((k) => (cards ?? []).filter((c) => c.kind === k));
 	const sections = $derived(
 		[
-			{ title: 'Unique for you', items: pick(['on_repeat', 'repeat_rewind']) },
 			{ title: 'Your Mixes', items: pick(['daily']) },
-			{ title: 'Discover new music', items: pick(['release_radar', 'discover_weekly']) }
+			{ title: 'Discover new music', items: pick(['release_radar', 'discover_weekly']) },
+			{ title: 'Unique for you', items: pick(['on_repeat', 'repeat_rewind']) }
 		].filter((s) => s.items.length)
 	);
 	const asItem = (c: MfyCard) => ({

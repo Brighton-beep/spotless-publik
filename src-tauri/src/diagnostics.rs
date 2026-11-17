@@ -141,7 +141,7 @@ fn header(app: &AppHandle, db: &Db) -> String {
         "Signed in: {} | Proxy: {} | Quality: {} | Normalize: {} | Crossfade: {} | Music videos: {} | Hide videos: {} | Disabled clients: {}",
         yes_no(db.get_setting("session_cookie").is_some_and(|c| !c.is_empty())),
         yes_no(db.get_setting("proxy").is_some_and(|p| !p.is_empty())),
-        db.get_setting("quality").unwrap_or_else(|| "HIGH".into()),
+        db.get_setting("quality").unwrap_or_else(|| "AUTO".into()),
         yes_no(db.get_setting("normalize_volume").as_deref() != Some("false")),
         crate::state::saved_crossfade(db).map_or_else(|| "off".into(), |s| format!("{s}s")),
         yes_no(db.get_setting("music_videos").as_deref() == Some("true")),

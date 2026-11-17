@@ -38,22 +38,22 @@ const SHELF_LEN: usize = 12;
 
 /// Apple's podcast genres shown as category tiles: (genre id, name, tile colour).
 pub const CATEGORIES: [(&str, &str, &str); 16] = [
-    ("1303", "Comedy", "#e13300"),
-    ("1489", "News", "#1e3264"),
-    ("1488", "True Crime", "#8c1932"),
-    ("1324", "Society & Culture", "#477d95"),
-    ("1545", "Sports", "#27856a"),
-    ("1321", "Business", "#503750"),
-    ("1512", "Health & Fitness", "#148a08"),
-    ("1487", "History", "#ba5d07"),
-    ("1533", "Science", "#0d73ec"),
-    ("1318", "Technology", "#8400e7"),
-    ("1309", "TV & Film", "#e8115b"),
-    ("1304", "Education", "#006450"),
-    ("1301", "Arts", "#af2896"),
-    ("1310", "Music", "#dc148c"),
-    ("1305", "Kids & Family", "#777777"),
-    ("1483", "Fiction", "#2d46b9"),
+    ("1303", "Comedy", "#be123c"),
+    ("1489", "News", "#15803d"),
+    ("1488", "True Crime", "#9d2bb0"),
+    ("1324", "Society & Culture", "#0e6ba8"),
+    ("1545", "Sports", "#a16207"),
+    ("1321", "Business", "#3f7d20"),
+    ("1512", "Health & Fitness", "#b0279f"),
+    ("1487", "History", "#d6246e"),
+    ("1533", "Science", "#0b7a75"),
+    ("1318", "Technology", "#6a2fd8"),
+    ("1309", "TV & Film", "#1f4fa8"),
+    ("1304", "Education", "#c2410c"),
+    ("1301", "Arts", "#be123c"),
+    ("1310", "Music", "#15803d"),
+    ("1305", "Kids & Family", "#9d2bb0"),
+    ("1483", "Fiction", "#0e6ba8"),
 ];
 
 /// The Podcasts chip's shelves. Local shelves are always fresh; the suggested ones come from the

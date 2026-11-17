@@ -85,4 +85,5 @@ keyring = { version = "3", features = ["apple-native"] }
 block2 = "0.6"
 
 [dev-dependencies]
+innertube = { path = "../innertube", features = ["test-util"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "test-util"] }

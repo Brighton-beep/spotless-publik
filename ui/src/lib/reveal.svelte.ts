@@ -8,8 +8,7 @@
 // network.
 //
 // Below `MIN_TO_CHUNK` nothing is held back: a grid you can see the end of gains nothing from this
-// and a sentinel is one more observer for no reason. Same call the queue panel makes
-// (`QueueList.svelte`, WINDOW_ABOVE).
+// and a sentinel is one more observer for no reason.
 
 /** Grids at or below this render whole, exactly as they always did. */
 const MIN_TO_CHUNK = 200;

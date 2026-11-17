@@ -540,6 +540,7 @@ export const signOut = () => invoke<void>('sign_out');
  * while the webview already holds a Google session.
  */
 export const loginWebview = (addAccount = false) => invoke<void>('login_webview', { addAccount });
+export const cancelLogin = () => invoke<void>('cancel_login');
 /** Saved Google accounts for the account menu (display fields only). */
 export const getGoogleAccounts = () => invoke<SavedAccount[]>('get_google_accounts');
 /** Activate a saved account without a Google re-login. Fails if its stored session expired. */
@@ -1052,6 +1053,9 @@ export const onLoginError = (cb: (msg: string) => void): Promise<UnlistenFn> =>
 	listen<string>('login-error', (e) => cb(e.payload));
 export const onLoginDone = (cb: () => void): Promise<UnlistenFn> =>
 	listen('login-done', () => cb());
+/** The user closed the Google sign-in window before signing in. */
+export const onLoginCancelled = (cb: () => void): Promise<UnlistenFn> =>
+	listen('login-cancelled', () => cb());
 
 // --- lyrics ---------------------------------------------------------------------------------
 export interface LyricWord {

@@ -23,6 +23,7 @@ import { friendlyNetError, isUnreachable } from './neterr';
 import { whenBackOnline } from './reconnect';
 import { setErrorWords, toast as kitToast } from './kit/toast';
 import { playSingleAt } from './trackapi'; // lane magic-d1
+import { nextSignIn, type SignInEvent, type SignInPhase } from './signin';
 
 // ── lane magic-d1 ── error toasts in the app's language (read when a toast shows).
 setErrorWords(() => ({ unreachable: t('errors.unreachable') }));
@@ -1313,6 +1314,7 @@ export const ui = $state({
 	channelPickerOpen: false,
 	channelPickerRequired: false, // true while a multi-channel login is not finalized yet
 	channelIdentities: [] as AccountIdentity[],
+	signIn: { kind: 'idle' } as SignInPhase, // the "Signing in…" sheet over the Google sign-in window
 	// Bumped by `refreshView`. The root layout keys the page on it alongside `auth.epoch`, so a
 	// refresh remounts the current route the same way a sign-in does.
 	epoch: 0,
@@ -1343,6 +1345,22 @@ export function refreshLanguage() {
 	refreshView();
 	loadLibrary(true);
 	if (library.extrasLoaded) loadLibraryExtras(true);
+}
+
+function signInEvent(event: SignInEvent) {
+	ui.signIn = nextSignIn(ui.signIn, event);
+}
+
+/** Open the Google sign-in window (or bring it back) and show "Signing in…" until Spotless is in. */
+export function startSignIn(addAccount = false) {
+	signInEvent({ type: 'start' });
+	api.loginWebview(addAccount).catch((e) => signInEvent({ type: 'error', message: String(e) }));
+}
+
+/** Cancel on the sheet: close the Google window and the sheet. */
+export function cancelSignIn() {
+	if (ui.signIn.kind === 'waiting') api.cancelLogin().catch(() => {});
+	signInEvent({ type: 'cancelled' });
 }
 
 export function openChannelPicker(required = false) {
@@ -1733,9 +1751,20 @@ export function initApp(mini = false): () => void {
 			clearCached();
 			auth.epoch++;
 		}),
-		api.onAccountSelectionRequired(() => openChannelPicker(true)),
-		api.onLoginError((msg) => kitToast.fail(msg, "Couldn't sign in")),
-		api.onLoginDone(() => toast.success(t('toasts.signed_in')))
+		api.onAccountSelectionRequired(() => {
+			signInEvent({ type: 'picker' });
+			openChannelPicker(true);
+		}),
+		// The sheet shows the error while it is up; a toast covers the rest.
+		api.onLoginError((msg) => {
+			if (ui.signIn.kind === 'idle') kitToast.fail(msg, "Couldn't sign in");
+			signInEvent({ type: 'error', message: msg });
+		}),
+		api.onLoginCancelled(() => signInEvent({ type: 'cancelled' })),
+		api.onLoginDone(() => {
+			signInEvent({ type: 'done' });
+			toast.success(t('toasts.signed_in'));
+		})
 	];
 	const teardown = () => subs.forEach((u) => u.then((f) => f()));
 	api.getQueue()

@@ -177,8 +177,11 @@
 	/** Play an episode tile, with its show as the context (Recents and Home record the show). */
 	const playEpisodeTile = (item: ShelfItem) => playShelfItem(item);
 
+	// Made for you has its own page (the iPhone's Show all opens it too); the rest list the shelf.
 	const showAllHref = (s: HomeShelf) =>
-		`/list?home=${encodeURIComponent(s.id)}&title=${encodeURIComponent(s.title)}`;
+		s.id === 'made_for_you'
+			? '/made-for-you'
+			: `/list?home=${encodeURIComponent(s.id)}&title=${encodeURIComponent(s.title)}`;
 
 	const showItem = (s: PodcastShow) => ({
 		kind: 'podcast' as const,

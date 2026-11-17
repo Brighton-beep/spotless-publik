@@ -30,6 +30,7 @@ pub mod library;
 pub mod local;
 pub mod loopback;
 pub mod localuser;
+pub mod login;
 pub mod lyrics;
 pub mod lyricsearch;
 pub mod orchestrator;
@@ -54,6 +55,8 @@ mod instant_tests; // stream: instant
 pub mod stats;
 pub mod videoproxy;
 
+#[cfg(test)]
+mod browse_tiles;
 #[cfg(test)]
 mod devmock_capture;
 

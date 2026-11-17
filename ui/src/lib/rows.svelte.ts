@@ -51,8 +51,8 @@ export function rowScroller() {
 			// and the rows it stands in for makes the correction non-zero: the correction fires a
 			// scroll event, which moves the window, which shifts the content again, and the list
 			// stutters on by itself after the wheel has stopped (issue #87, Windows/WebView2 only,
-			// since WebKitGTK anchors nothing). QueueList.togglePrev compensates by hand for the
-			// same reason and would otherwise be corrected twice here.
+			// since WebKitGTK anchors nothing). A hand-rolled correction on top
+			// would be corrected twice here.
 			node.style.overflowAnchor = 'none';
 			const read = () => {
 				scrollTop = node.scrollTop;

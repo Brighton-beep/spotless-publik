@@ -125,7 +125,7 @@ pub async fn cache_size(state: St<'_>) -> Result<u64, String> {
 }
 
 /// Open the in-app Google sign-in webview (context/15 Path A). Completes asynchronously; the UI
-/// hears back via `auth-changed` (success) or `login-error`. With `add_account`, the webview
+/// hears back via `auth-changed` + `login-done` (success), `login-error` or `login-cancelled`. With `add_account`, the webview
 /// opens Google's AddSession screen so a second account can be added even when the webview
 /// already holds a Google session.
 #[tauri::command]
@@ -137,6 +137,12 @@ pub async fn login_webview(
     let state = state.inner().clone();
     crate::session::open_login(app, state, add_account.unwrap_or(false));
     Ok(())
+}
+
+/// Close the sign-in window (Cancel on the main window's "Signing in" sheet).
+#[tauri::command]
+pub fn cancel_login(app: tauri::AppHandle) {
+    crate::session::cancel_login(&app);
 }
 
 // --- mini player (mini.rs) ------------------------------------------------------------------

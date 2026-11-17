@@ -335,7 +335,7 @@ async function full() {
 	log('phase:paused-idle:end');
 	// ── soak: ~30 min of browsing compressed (150 page visits) ──
 	log('phase:soak:start');
-	const route = ['/', pl(p1k || p5k), '/search?q=radiohead', `/album/${album}`, pl(p5k || p1k), '/library', `/artist/${artist}`];
+	const route = ['/', pl(p1k || p5k), '/search?q=radiohead', `/album/${album}`, pl(p5k || p1k), '/history', `/artist/${artist}`];
 	const t0 = performance.now();
 	for (let i = 0; i < 150; i++) {
 		await step('soak', () => goto(route[i % route.length]));

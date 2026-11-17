@@ -1,3 +1,4 @@
-## Spotless 1.0.3 (Mac)
+## Spotless 1.0.4-rc.1 (test build)
 
-- The window always opens fully on screen, so the welcome screen is never hidden below the edge on first launch.
+- YouTube Music sign-in signs Spotless in directly (one login, window closes itself).
+- Mac/iPhone parity fixes, installer named "Spotless Installer".

@@ -267,7 +267,7 @@ codesign --verify --deep --strict --verbose=1 "$APP"
 step "dmg"
 DMG="$OUT/$PRODUCT-$VERSION.dmg"
 # Styled window (background with a drag arrow, fixed layout, volume icon); needs a GUI session.
-"$ROOT/scripts/macos/make-dmg.sh" "$APP" "$DMG" "$PRODUCT"
+"$ROOT/scripts/macos/make-dmg.sh" "$APP" "$DMG" "$PRODUCT Installer"
 if [ -n "${SIGN_IDENTITY:-}" ]; then
   codesign --force --timestamp -s "$SIGN_IDENTITY" "$DMG"
   NOTARY_AUTH=()

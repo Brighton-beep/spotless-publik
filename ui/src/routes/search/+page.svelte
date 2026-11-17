@@ -15,14 +15,12 @@
 	import * as api from '$lib/api';
 	import type { BrowseItem, ExploreItem, PodcastEpisode, PodcastSearchResults, PodcastShow, SearchOverview, SearchResults, SongItem } from '$lib/api';
 	import { Card, ErrorState, Shelf, Skeleton, TrackTable } from '$lib/kit';
-	import Icon from '$lib/kit/Icon.svelte';
 	import IconButton from '$lib/kit/IconButton.svelte';
 	import XIcon from 'phosphor-svelte/lib/XIcon';
-	import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 	import { showHref } from '$lib/kit/actions';
 	import { getCached, putCached } from '$lib/pagecache';
 	import { overview } from '$lib/discover/overview'; // stream: search-dropdown — shared with the top bar
-	import { forgetSearch, personal, playback } from '$lib/player.svelte';
+	import { playback } from '$lib/player.svelte';
 	import ExploreCard from '$lib/discover/ExploreCard.svelte';
 	import { cardSubtitle } from '$lib/discover/format'; // parity3
 	import { podcasts } from '$lib/podcasts.svelte';
@@ -34,9 +32,9 @@
 	import VideoCard from '$lib/artistpods/VideoCard.svelte';
 	import { actions, openTrackMenu } from '$lib/kit';
 	import BrowseTile from '$lib/discover/BrowseTile.svelte';
-	import { addRecent, recentSearches, removeRecent, type RecentItem } from '$lib/discover/recents.svelte';
+	import { addRecent, clearRecents, recentSearches, removeRecent, type RecentItem } from '$lib/discover/recents.svelte';
 	import { isPlaying, playBrowse, toggle, moodHref } from '$lib/discover/play.svelte';
-	import { TILE_COLORS, loadCharts, loadMoodArt, loadMoods, loadNewReleases, markSkips } from '$lib/discover/data';
+	import { TILE, TILE_COLORS, loadCharts, loadMoodArt, loadMoods, loadNewReleases, markSkips } from '$lib/discover/data';
 
 	type Filter = 'all' | api.SearchChip | 'audiobooks'; // audiobooks: stream audiobooks
 	// Spotify's chip order (search-and-browse.md §29); Episodes and Videos are ours, after it.
@@ -414,15 +412,11 @@
 		const fixed: Tile[] = [
 			// Spotify's order (parity3): Music · Podcasts · Audiobooks · Live events · Made for you ·
 			// New releases. Spotless has no Live events; Charts stands in for the Music tile.
-			{ title: 'Charts', color: '#8d67ab', href: '/charts' },
-			{
-				title: 'Podcasts',
-				color: '#006450',
-				href: '/browse/podcasts'
-			},
-			{ title: 'Audiobooks', color: '#b0461e', href: '/browse/audiobooks' }, // stream: audiobooks
-			{ title: 'Made for you', color: '#1e3264', href: '/made-for-you' }, // stream: smart2
-			{ title: 'New Releases', color: '#e8115b', href: '/new-releases' }
+			{ title: 'Charts', color: TILE.charts, href: '/charts' },
+			{ title: 'Podcasts', color: TILE.podcasts, href: '/browse/podcasts' },
+			{ title: 'Audiobooks', color: TILE.audiobooks, href: '/browse/audiobooks' }, // stream: audiobooks
+			{ title: 'Made for you', color: TILE.made_for_you, href: '/made-for-you' }, // stream: smart2
+			{ title: 'New Releases', color: TILE.new_releases, href: '/new-releases' }
 		];
 		tiles = fixed;
 		const [moods] = await Promise.all([
@@ -477,15 +471,8 @@
 		}
 	}
 
-	// Recent searches: entities opened from results, then plain queries.
-	type Recent = { kind: 'item'; item: RecentItem } | { kind: 'query'; text: string };
-	const recents = $derived<Recent[]>([
-		...recentSearches.items.map((item) => ({ kind: 'item' as const, item })),
-		...personal.searches
-			.filter((t) => !recentSearches.items.some((r) => r.title.toLowerCase() === t.toLowerCase()))
-			.slice(0, 10)
-			.map((text) => ({ kind: 'query' as const, text }))
-	]);
+	// Recent searches: only what you opened from results, never plain typed queries (as on the iPhone).
+	const recents = $derived(recentSearches.items);
 	const remember = (i: BrowseItem | RecentItem) => addRecent(i);
 	const fold = (x: string) => x.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 </script>
@@ -510,26 +497,11 @@
 	<!-- ───────────── Browse (empty query) ───────────── -->
 	<div class="flex flex-col gap-8 px-[var(--content-spacing)] pt-[67px] pb-10">
 		{#if recents.length}
-			<Shelf title="Recent searches" items={recents}>
+			<Shelf title="Recent searches" items={recents} showAllLabel="Clear recent searches" onShowAll={clearRecents}>
 				{#snippet card(r)}
 					<div class="group/recent relative">
-						{#if r.kind === 'item'}
-							<ExploreCard item={r.item as BrowseItem} onOpen={() => remember(r.item)} />
-							{@render removeButton(() => removeRecent(r.item.id))}
-						{:else}
-							<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-							<div
-								class="flex cursor-pointer flex-col gap-2 rounded-md p-3 transition-colors duration-200 hover:bg-bg-highlight"
-								onclick={() => goto(`/search?q=${encodeURIComponent(r.text)}`)}
-							>
-								<div class="grid aspect-square w-full place-items-center rounded-md bg-bg-menu text-text-subdued shadow-card-image">
-									<Icon icon={MagnifyingGlassIcon} size={48} />
-								</div>
-								<span class="line-clamp-2 text-base leading-[22px] text-white">{r.text}</span>
-								<span class="-mt-1.5 text-sm text-text-subdued">Search</span>
-							</div>
-							{@render removeButton(() => forgetSearch(r.text))}
-						{/if}
+						<ExploreCard item={r as BrowseItem} onOpen={() => remember(r)} />
+						{@render removeButton(() => removeRecent(r.id))}
 					</div>
 				{/snippet}
 			</Shelf>

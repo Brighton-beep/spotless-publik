@@ -8,7 +8,7 @@
 	import { ErrorState, Shelf, Skeleton } from '$lib/kit';
 	import BrowseHeader from '$lib/discover/BrowseHeader.svelte';
 	import ExploreCard from '$lib/discover/ExploreCard.svelte';
-	import { NEW_KEY, loadNewReleases, peek } from '$lib/discover/data';
+	import { NEW_KEY, TILE, loadNewReleases, peek } from '$lib/discover/data';
 
 	let data = $state<NewReleasesPage | null>(peek<NewReleasesPage>(NEW_KEY));
 	let error = $state(false);
@@ -29,7 +29,7 @@
 </script>
 
 <div class="relative isolate min-h-full pb-10">
-	<BrowseHeader title="New Releases" color="#e8115b" eyebrow="Browse" />
+	<BrowseHeader title="New Releases" color={TILE.new_releases} eyebrow="Browse" />
 	<div class="flex flex-col gap-8 px-[var(--content-spacing)]">
 		{#if error}
 			<ErrorState message="Try reloading the page." onRetry={load} />

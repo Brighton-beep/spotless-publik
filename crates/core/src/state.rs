@@ -722,11 +722,7 @@ impl AppState {
     }
 
     pub fn quality(&self) -> AudioQuality {
-        match self.db.get_setting("quality").as_deref() {
-            Some("LOW") => AudioQuality::Low,
-            Some("AUTO") => AudioQuality::Auto,
-            _ => AudioQuality::High,
-        }
+        streaming_quality(self.db.get_setting("quality").as_deref())
     }
 
     /// User-disabled stream clients — comma-separated setting. Also the force-fail lever for the
@@ -5728,6 +5724,18 @@ fn failure_action(
     }
 }
 
+/// The `quality` setting, the one key both apps write (the Mac's Select; the iPhone resolves its
+/// per-network choices into it). Five choices, two real YouTube tiers: Low and Normal cap at about
+/// 128 kbit/s, High and Very high take the best stream. Unset is Automatic, the default on both;
+/// it plays as High (the core does not know the network; the iPhone resolves it before writing).
+pub fn streaming_quality(setting: Option<&str>) -> AudioQuality {
+    match setting {
+        Some("LOW" | "NORMAL") => AudioQuality::Low,
+        Some("HIGH" | "VERY_HIGH") => AudioQuality::High,
+        _ => AudioQuality::Auto,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -5743,6 +5751,18 @@ mod tests {
     };
     use super::{failure_action, resolve_failure_action, FailAction, ResolveFail, MAX_FAILURE_STREAK}; // stream: proxyfix
     use super::{install_single, SINGLE_BATCH};
+    use super::streaming_quality;
+
+    #[test]
+    fn streaming_quality_defaults_to_automatic() {
+        use super::AudioQuality;
+        assert_eq!(streaming_quality(None), AudioQuality::Auto);
+        assert_eq!(streaming_quality(Some("AUTO")), AudioQuality::Auto);
+        assert_eq!(streaming_quality(Some("LOW")), AudioQuality::Low);
+        assert_eq!(streaming_quality(Some("NORMAL")), AudioQuality::Low);
+        assert_eq!(streaming_quality(Some("HIGH")), AudioQuality::High);
+        assert_eq!(streaming_quality(Some("VERY_HIGH")), AudioQuality::High);
+    }
     use super::{restore_queued_rows, splice_queued_at}; // lane magic-d2
 
     // ── stream: autoplay ── Spotify's context rules at the queue level.

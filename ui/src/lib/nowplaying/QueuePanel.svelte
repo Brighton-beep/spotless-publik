@@ -267,6 +267,7 @@
 			paused={playback.paused}
 			selected={selected === r.i}
 			index={r.i}
+			reason={r.item.reason}
 			skip={skips[r.item.video_id]}
 			onplay={() => play(r.i)}
 			onmenu={(e) => menu(e, r)}
@@ -394,13 +395,18 @@
 		{/if}
 
 		{#if autoplayShown.length}
-			{@render heading('Next: Autoplay')}
-			<div role="row"><div role="gridcell" class="-mt-1 px-2 pb-2 text-sm text-text-subdued">
-				Autoplay keeps similar music going.
-				<button type="button" class="font-bold text-white hover:underline" onclick={() => setAutoplay(false)}
-					>Turn off</button
-				>
-			</div></div>
+			{#if view.upNext}
+				<!-- Podcast up next: the core's predicted episodes, each row showing its reason. -->
+				{@render heading('Next up')}
+			{:else}
+				{@render heading('Next: Autoplay')}
+				<div role="row"><div role="gridcell" class="-mt-1 px-2 pb-2 text-sm text-text-subdued">
+					Autoplay keeps similar music going.
+					<button type="button" class="font-bold text-white hover:underline" onclick={() => setAutoplay(false)}
+						>Turn off</button
+					>
+				</div></div>
+			{/if}
 			{#each autoplayShown as r (r.key)}{@render row(r)}{/each}
 		{:else if !autoplayOn && !more}
 			<div role="row"><div role="gridcell" class="px-2 pt-6 text-sm text-text-subdued">

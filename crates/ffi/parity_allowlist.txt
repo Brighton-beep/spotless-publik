@@ -6,7 +6,7 @@
 desktop-only: windows, tray, mini player, hotkeys, launch args, self-update: open_mini close_mini set_mini_compact show_main quit_app take_launch_args theater_fullscreen can_self_update get_global_hotkeys global_hotkeys_on_wayland set_global_hotkeys reset_global_hotkeys
 desktop-only: desktop OS integration (the phone uses share sheets, AVAudioSession routes, NWPathMonitor and os_log): open_external reveal_in_finder save_text_file audio_devices set_audio_device network_reachable log_ui
 desktop-only: diagnostics window: diagnostics diagnostics_summary save_diagnostics get_stream_clients playback_health
-desktop-only: Google sign-in through a desktop webview (iOS signs in with account_sign_in): login_webview get_google_accounts switch_google_account remove_google_account
+desktop-only: Google sign-in through a desktop webview (iOS signs in with account_sign_in): login_webview cancel_login get_google_accounts switch_google_account remove_google_account
 desktop-only: <video> element over the loopback proxy (iOS: mpv draws into a CAMetalLayer, video.rs): video_stream forget_video_stream
 desktop-only: local music folders (no user music folders in the iOS sandbox): add_local_folder remove_local_folder get_local_library
 desktop-only: Limusic migration and file-picker import: lib_migrate_legacy import_read_file local_playlists add_to_local_playlist

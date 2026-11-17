@@ -10,7 +10,7 @@
 	import { getVersion } from '@tauri-apps/api/app';
 	import { open as pickFolder } from '@tauri-apps/plugin-dialog';
 	import * as api from '$lib/api';
-	import { auth, local, scanLocal, addLocalFolder, removeLocalFolder, prefs, setAutoplay } from '$lib/player.svelte';
+	import { auth, local, scanLocal, addLocalFolder, removeLocalFolder, prefs, setAutoplay, startSignIn } from '$lib/player.svelte';
 	import { lib } from '$lib/library.svelte';
 	import {
 		downloads,
@@ -115,6 +115,22 @@
 	}
 	const on = (key: string, dflt = false) => (settings[key] === undefined ? dflt : settings[key] === 'true');
 
+	// Ask first, as the iPhone does: signing out drops the YouTube playlists and recommendations.
+	async function signOut() {
+		const ok = await confirmDialog({
+			title: 'Sign out of YouTube?',
+			body: 'Your library on this Mac stays as it is.',
+			confirmLabel: 'Sign out'
+		});
+		if (!ok) return;
+		try {
+			await api.signOut();
+			toast.success('Signed out of YouTube');
+		} catch {
+			toast.error("Couldn't sign out. Try again.");
+		}
+	}
+
 	// ── Audio quality ──
 	const QUALITY = [
 		{ value: 'AUTO', label: 'Automatic' },
@@ -123,7 +139,8 @@
 		{ value: 'HIGH', label: 'High' },
 		{ value: 'VERY_HIGH', label: 'Very high' }
 	];
-	const quality = $derived(settings.quality ?? 'HIGH');
+	// Automatic by default, as on the iPhone (core `streaming_quality`).
+	const quality = $derived(settings.quality ?? 'AUTO');
 	const LEVELS: { value: api.VolumeLevel; label: string }[] = [
 		{ value: 'loud', label: 'Loud' },
 		{ value: 'normal', label: 'Normal' },
@@ -422,11 +439,9 @@
 			>
 				{#snippet control()}
 					{#if account?.signedIn}
-						<Pill variant="outline" onclick={() => api.signOut().catch((e) => toast.error(String(e)))}>Sign out</Pill>
+						<Pill variant="outline" onclick={signOut}>Sign out</Pill>
 					{:else}
-						<Pill variant="outline" onclick={() => api.loginWebview().catch((e) => toast.error(String(e)))}>
-							Sign in <Icon icon={ArrowSquareOutIcon} size={16} />
-						</Pill>
+						<Pill variant="outline" onclick={() => startSignIn()}>Sign in</Pill>
 					{/if}
 				{/snippet}
 			</Row>
@@ -662,24 +677,12 @@
 					<Switch label="Crossfade songs" checked={crossfadeOn} onchange={toggleCrossfade} />
 				{/snippet}
 			</Row>
-			<Row label="Gapless playback">
-				{#snippet children()}
-					<span class="mt-1 flex items-center gap-1.5 text-xs">
-						<Icon icon={InfoIcon} size={16} class="shrink-0" />
-						Always on: songs play back to back without a pause whenever crossfade is off.
-					</span>
-				{/snippet}
-			</Row>
-			<Row label="Shuffle - Smart shuffle favors songs you love and skips ones you don't; Standard is a plain random order">
+			<Row label="Smart Shuffle suggestions - Shuffle in your own playlists adds recommendations that fit.">
 				{#snippet control()}
-					<Select
-						value={smart.shuffle_mode}
-						label="Shuffle"
-						options={[
-							{ value: 'smart', label: 'Smart' },
-							{ value: 'standard', label: 'Standard' }
-						]}
-						onchange={(v) => smartSet('shuffle_mode', v)}
+					<Switch
+						label="Smart Shuffle suggestions"
+						checked={smart.shuffle_mode === 'smart'}
+						onchange={(on) => smartSet('shuffle_mode', on ? 'smart' : 'standard')}
 					/>
 				{/snippet}
 			</Row>

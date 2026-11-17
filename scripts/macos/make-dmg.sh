@@ -19,7 +19,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 APP="${1:?usage: make-dmg.sh <App.app> <out.dmg> [volume name]}"
 DMG="${2:?usage: make-dmg.sh <App.app> <out.dmg> [volume name]}"
 APPNAME="$(basename "$APP")"
-VOL="${3:-${APPNAME%.app}}"
+# "Spotless Installer", not "Spotless": the mounted disk on the desktop must not read as the app.
+VOL="${3:-${APPNAME%.app} Installer}"
 # Window geometry, shared with dmg-background.swift: icon centres in a 640x400 content area.
 W=640 H=400 LEFT_X=160 RIGHT_X=480 ICON_Y=170 ICON=128
 
@@ -47,8 +48,13 @@ ditto "$APP" "$STAGE/$APPNAME"
 ln -s /Applications "$STAGE/Applications"
 xcrun swift "$HERE/dmg-background.swift" "$WORK" >/dev/null
 tiffutil -cathidpicheck "$WORK/background.png" "$WORK/background@2x.png" -out "$STAGE/.background/background.tiff" 2>/dev/null
-ICNS="$APP/Contents/Resources/$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist" 2>/dev/null || echo icon)"
-[ -f "$ICNS" ] || ICNS="$ICNS.icns"
+# The volume icon is the app icon with a download badge (scripts/brand/make-installer-icon.py), so
+# the installer and the installed app never look the same. Falls back to the plain app icon.
+ICNS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/installer-icon.icns"
+if [ ! -f "$ICNS" ]; then
+  ICNS="$APP/Contents/Resources/$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist" 2>/dev/null || echo icon)"
+  [ -f "$ICNS" ] || ICNS="$ICNS.icns"
+fi
 
 SIZE_MB=$(( $(du -sm "$STAGE" | cut -f1) + 20 ))
 # `hdiutil create` fails with "Resource busy" now and then on CI runners; a retry fixes it.

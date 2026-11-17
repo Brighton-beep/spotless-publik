@@ -27,7 +27,8 @@
 		onplay,
 		onmenu,
 		onselect,
-		index
+		index,
+		reason
 	}: {
 		song: SongItem;
 		/** The playing row: accent title, equaliser over the cover. */
@@ -40,6 +41,8 @@
 		onselect?: (e: MouseEvent) => void;
 		/** a11y: queue index, exposed as data-queue-index for the panel's keyboard handling. */
 		index?: number;
+		/** Why a predicted podcast episode is up next ("Next episode of …"): replaces the artist line. */
+		reason?: string;
 	} = $props();
 
 	const inert = $derived(!!skip || !!song.unavailable);
@@ -107,6 +110,9 @@
 						<Icon icon={MonitorPlayIcon} size={14} class="shrink-0" />
 						<span class="shrink-0">Music video •</span>
 					{/if}
+					{#if reason}
+						<span class="truncate">{reason}</span>
+					{:else}
 					<span class="truncate">
 						{#each artists as a, i (i)}
 							{#if i > 0}, {/if}
@@ -119,6 +125,7 @@
 							{:else}{a.name}{/if}
 						{/each}
 					</span>
+					{/if}
 				</div>
 			</div>
 			<button

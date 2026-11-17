@@ -1,6 +1,7 @@
 // Cached loaders shared by the discover pages, so Home → "Show all" → back and Search → genre
 // paint instantly from the page cache (5 min) and only revalidate behind the scenes.
 import * as api from '$lib/api';
+import tiles from '../../../../crates/core/browse_tiles.json';
 import type {
 	ChartsPage,
 	MoodSection,
@@ -80,25 +81,10 @@ export const loadGenre = (params: string) =>
 		api.getBrowseSections(api.MOODS_CATEGORY_ID, params)
 	);
 
-/** Spotify-like colours for the fixed Browse tiles (charts, new releases, podcasts…). */
-export const TILE_COLORS = [
-	'#e13300',
-	'#006450',
-	'#8400e7',
-	'#1e3264',
-	'#e8115b',
-	'#27856a',
-	'#477d95',
-	'#ba5d07',
-	'#509bf5',
-	'#8d67ab',
-	'#af2896',
-	'#148a08',
-	'#503750',
-	'#e91429',
-	'#0d73ec',
-	'#777777'
-];
+/** Browse tile colours: one list for both apps, in `crates/core/browse_tiles.json` (the iPhone
+ *  mirrors its hexes). `TILE` are the fixed tiles; `TILE_COLORS` cycle over genre and mood tiles. */
+export const TILE = tiles.fixed;
+export const TILE_COLORS: string[] = tiles.palette;
 
 /** Grey rows playback would step over (explicit filter / unavailable), per the page brief. */
 export async function markSkips(songs: import('$lib/api').SongItem[]) {
