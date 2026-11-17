@@ -1,0 +1,18 @@
+# S3 (b): rustypipe-botguard (deno_core 0.331 + V8 130) built from source for iOS.
+# Not built by default. See build.sh and docs/streams/ios-js.md (music-app docs).
+[package]
+name = "bgios"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+rustypipe-botguard = "=0.1.2"
+v8 = "=130.0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[patch.crates-io]
+# A copy of the crates.io v8-130.0.7 source with v8-130.0.7-ios.patch applied (build.sh makes it).
+v8 = { path = "target/v8-src/v8-130.0.7" }
+
+[workspace]

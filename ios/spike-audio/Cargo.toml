@@ -1,0 +1,24 @@
+# iOS spike S1 (audio): a staticlib the SwiftUI spike app links, driving crates/player against
+# MPVKit's libmpv. Its own workspace on purpose: the desktop workspace (and its Cargo.lock) is
+# untouched, and nothing here builds unless asked for (ios/spike-audio/build.sh).
+[package]
+name = "spike-audio"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+player = { path = "../../crates/player" }
+libmpv2 = "4"
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+
+[workspace]

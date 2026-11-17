@@ -1,0 +1,75 @@
+[package]
+name = "limusic-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Spotless — free, ad-free desktop music player (fork of Limusic)"
+rust-version = "1.80"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { workspace = true }
+notify = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["net", "io-util", "sync"] }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tauri = { version = "2", features = ["tray-icon", "protocol-asset", "macos-private-api", "image-png"] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-global-shortcut = "2"
+regex = "1"
+urlencoding = "2"
+
+# Everything the app does that isn't a window: transport, player, database, queue, smart,
+# podcasts, import, lyrics (crates/core, shared with iOS). Its default features keep BotGuard (V8)
+# and Japanese romanization (lindera) on for the desktop.
+encore-core = { path = "../crates/core" }
+innertube = { path = "../crates/innertube" }
+player = { path = "../crates/player" }
+souvlaki = { version = "0.8.3", default-features = false, features = ["use_zbus"] }
+futures-util = { workspace = true }
+tauri-plugin-dialog = "2.7.2"
+tauri-plugin-window-state = "2.4.1"
+tauri-plugin-clipboard-manager = "2.3.2"
+# Track-change notifications (notify.rs): D-Bus on Linux, WinRT toasts, NSUserNotification.
+notify-rust = "4"
+
+[dev-dependencies]
+# Mock runtime for the IPC guard test (lib.rs `only_ui`).
+tauri = { version = "2", features = ["test"] }
+
+# Letting a song notification show while Limusic is frontmost (notify.rs, #94). Same objc2 that
+# mac-notification-sys and tao already pull in.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+
+# Taskbar thumbnail toolbar (#47). Same `windows` version tauri-runtime-wry already pulls in, so
+# `Window::hwnd()` hands us a matching HWND.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_System_Com",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The music video's GL surface under the webview (nativevideo.rs). Same version tauri pulls in.
+gtk = "0.18"
+ksni = "0.3.6"
+libc = "0.2"
+# Reaching the WebKitGTK settings wry leaves at browser defaults. Must track wry's version.
+webkit2gtk = { version = "2.0", features = ["v2_40"] }
+# Holding off suspend while playing (inhibit.rs, #347). Already in the tree through notify-rust.
+zbus = "5"

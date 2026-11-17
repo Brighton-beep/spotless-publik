@@ -1,0 +1,642 @@
+[
+ {
+  "q": "chris williamson",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Modern Wisdom"
+  }
+ },
+ {
+  "q": "joe rogan",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "The Joe Rogan Experience"
+  }
+ },
+ {
+  "q": "lex fridman",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Lex Fridman Podcast"
+  }
+ },
+ {
+  "q": "steven bartlett",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "The Diary Of A CEO"
+  }
+ },
+ {
+  "q": "andrew huberman",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Huberman Lab"
+  }
+ },
+ {
+  "q": "alex cooper",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Call Her Daddy"
+  }
+ },
+ {
+  "q": "tim ferriss",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "The Tim Ferriss Show"
+  }
+ },
+ {
+  "q": "mel robbins",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "The Mel Robbins Podcast"
+  }
+ },
+ {
+  "q": "jay shetty",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "On Purpose with Jay Shetty"
+  }
+ },
+ {
+  "q": "dax shepard",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Armchair Expert with Dax Shepard"
+  }
+ },
+ {
+  "q": "peter attia",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "The Peter Attia Drive"
+  }
+ },
+ {
+  "q": "theo von",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "This Past Weekend w/ Theo Von"
+  }
+ },
+ {
+  "q": "rich roll",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "The Rich Roll Podcast"
+  }
+ },
+ {
+  "q": "marc maron",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "WTF with Marc Maron"
+  }
+ },
+ {
+  "q": "shannon sharpe",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Club Shay Shay"
+  }
+ },
+ {
+  "q": "ezra klein",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "The Ezra Klein Show"
+  }
+ },
+ {
+  "q": "sam harris",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Making Sense with Sam Harris"
+  }
+ },
+ {
+  "q": "dan carlin",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Dan Carlin's Hardcore History"
+  }
+ },
+ {
+  "q": "malcolm gladwell",
+  "cat": "person_podcast",
+  "want": {
+   "kind": "podcast",
+   "title": "Revisionist History"
+  }
+ },
+ {
+  "q": "dua lipa",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Dua Lipa"
+  }
+ },
+ {
+  "q": "kendrick lamar",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Kendrick Lamar"
+  }
+ },
+ {
+  "q": "billie eilish",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Billie Eilish"
+  }
+ },
+ {
+  "q": "the weeknd",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "The Weeknd"
+  }
+ },
+ {
+  "q": "bad bunny",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Bad Bunny"
+  }
+ },
+ {
+  "q": "arctic monkeys",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Arctic Monkeys"
+  }
+ },
+ {
+  "q": "sza",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "SZA"
+  }
+ },
+ {
+  "q": "post malone",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Post Malone"
+  }
+ },
+ {
+  "q": "olivia rodrigo",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Olivia Rodrigo"
+  }
+ },
+ {
+  "q": "fred again",
+  "cat": "artist",
+  "want": {
+   "kind": "artist",
+   "title": "Fred again.."
+  }
+ },
+ {
+  "q": "dua lip",
+  "cat": "partial",
+  "want": {
+   "kind": "artist",
+   "title": "Dua Lipa"
+  }
+ },
+ {
+  "q": "kendrick la",
+  "cat": "partial",
+  "want": {
+   "kind": "artist",
+   "title": "Kendrick Lamar"
+  }
+ },
+ {
+  "q": "arctic mon",
+  "cat": "partial",
+  "want": {
+   "kind": "artist",
+   "title": "Arctic Monkeys"
+  }
+ },
+ {
+  "q": "olivia rod",
+  "cat": "partial",
+  "want": {
+   "kind": "artist",
+   "title": "Olivia Rodrigo"
+  }
+ },
+ {
+  "q": "modern wis",
+  "cat": "partial",
+  "want": {
+   "kind": "podcast",
+   "title": "Modern Wisdom"
+  }
+ },
+ {
+  "q": "diary of a c",
+  "cat": "partial",
+  "want": {
+   "kind": "podcast",
+   "title": "The Diary Of A CEO"
+  }
+ },
+ {
+  "q": "kendrik lamar",
+  "cat": "typo",
+  "want": {
+   "kind": "artist",
+   "title": "Kendrick Lamar"
+  }
+ },
+ {
+  "q": "billie elish",
+  "cat": "typo",
+  "want": {
+   "kind": "artist",
+   "title": "Billie Eilish"
+  }
+ },
+ {
+  "q": "arctic monkies",
+  "cat": "typo",
+  "want": {
+   "kind": "artist",
+   "title": "Arctic Monkeys"
+  }
+ },
+ {
+  "q": "post malon",
+  "cat": "typo",
+  "want": {
+   "kind": "artist",
+   "title": "Post Malone"
+  }
+ },
+ {
+  "q": "olivia rodrigio",
+  "cat": "typo",
+  "want": {
+   "kind": "artist",
+   "title": "Olivia Rodrigo"
+  }
+ },
+ {
+  "q": "joe rogen",
+  "cat": "typo",
+  "want": {
+   "kind": "podcast",
+   "title": "The Joe Rogan Experience"
+  }
+ },
+ {
+  "q": "bohemain rapsodyy",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Bohemian Rhapsody",
+   "artist": "Queen"
+  }
+ },
+ {
+  "q": "tayler swfit lovr story",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Love Story",
+   "artist": "Taylor Swift"
+  }
+ },
+ {
+  "q": "mettalica enter sandman",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Enter Sandman",
+   "artist": "Metallica"
+  }
+ },
+ {
+  "q": "smells lik teen sprit",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Smells Like Teen Spirit",
+   "artist": "Nirvana"
+  }
+ },
+ {
+  "q": "imagin dragns",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "artist",
+   "title": "Imagine Dragons"
+  }
+ },
+ {
+  "q": "led zepelin stairway",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Stairway to Heaven",
+   "artist": "Led Zeppelin"
+  }
+ },
+ {
+  "q": "rhianna umbrela",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Umbrella",
+   "artist": "Rihanna"
+  }
+ },
+ {
+  "q": "arianna grandee",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "artist",
+   "title": "Ariana Grande"
+  }
+ },
+ {
+  "q": "eminme lose yourslf",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Lose Yourself",
+   "artist": "Eminem"
+  }
+ },
+ {
+  "q": "coldpaly yelow",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Yellow",
+   "artist": "Coldplay"
+  }
+ },
+ {
+  "q": "despasito",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Despacito",
+   "artist": "Luis Fonsi"
+  }
+ },
+ {
+  "q": "beleiver imagin dragons",
+  "cat": "hard_typo",
+  "want": {
+   "kind": "song",
+   "title": "Believer",
+   "artist": "Imagine Dragons"
+  }
+ },
+ {
+  "q": "bohem rhaps",
+  "cat": "hard_half",
+  "want": {
+   "kind": "song",
+   "title": "Bohemian Rhapsody",
+   "artist": "Queen"
+  }
+ },
+ {
+  "q": "metalli",
+  "cat": "hard_half",
+  "want": {
+   "kind": "artist",
+   "title": "Metallica"
+  }
+ },
+ {
+  "q": "nirv",
+  "cat": "hard_half",
+  "want": {
+   "kind": "artist",
+   "title": "Nirvana"
+  }
+ },
+ {
+  "q": "radioh",
+  "cat": "hard_half",
+  "want": {
+   "kind": "artist",
+   "title": "Radiohead"
+  }
+ },
+ {
+  "q": "bruno ma",
+  "cat": "hard_half",
+  "want": {
+   "kind": "artist",
+   "title": "Bruno Mars"
+  }
+ },
+ {
+  "q": "blinding lig",
+  "cat": "hard_half",
+  "want": {
+   "kind": "song",
+   "title": "Blinding Lights",
+   "artist": "The Weeknd"
+  }
+ },
+ {
+  "q": "shape of y",
+  "cat": "hard_half",
+  "want": {
+   "kind": "song",
+   "title": "Shape of You",
+   "artist": "Ed Sheeran"
+  }
+ },
+ {
+  "q": "billie ji",
+  "cat": "hard_half",
+  "want": {
+   "kind": "song",
+   "title": "Billie Jean",
+   "artist": "Michael Jackson"
+  }
+ },
+ {
+  "q": "kino gruppa krovi",
+  "cat": "hard_translit",
+  "want": {
+   "kind": "song",
+   "title": "Gruppa krovi",
+   "artist": "Kino"
+  },
+  "note": "alias: Gruppa krovi = Группа крови; Kino = Кино"
+ },
+ {
+  "q": "yoru ni kakeru",
+  "cat": "hard_translit",
+  "want": {
+   "kind": "song",
+   "title": "Yoru ni Kakeru",
+   "artist": "YOASOBI"
+  },
+  "note": "alias: Yoru ni Kakeru = 夜に駆ける; Yoru ni Kakeru = Racing Into The Night"
+ },
+ {
+  "q": "gangnam seutail",
+  "cat": "hard_translit",
+  "want": {
+   "kind": "song",
+   "title": "Gangnam Style",
+   "artist": "PSY"
+  },
+  "note": "alias: Gangnam Style = 강남스타일"
+ },
+ {
+  "q": "tum hi ho arijit",
+  "cat": "hard_translit",
+  "want": {
+   "kind": "song",
+   "title": "Tum Hi Ho",
+   "artist": "Arijit Singh"
+  }
+ },
+ {
+  "q": "lemon kenshi yonezu",
+  "cat": "hard_translit",
+  "want": {
+   "kind": "song",
+   "title": "Lemon",
+   "artist": "Kenshi Yonezu"
+  },
+  "note": "alias: Kenshi Yonezu = 米津玄師"
+ },
+ {
+  "q": "nuevayol",
+  "cat": "hard_translit",
+  "want": {
+   "kind": "song",
+   "title": "NUEVAYoL",
+   "artist": "Bad Bunny"
+  }
+ },
+ {
+  "q": "asdfghjkl",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "qwertyuiop",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "zxcvbnm",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "jjjjjjjjjj",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "xqzvwpl kjh",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "ghfjdkslaa",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "mnbvcxz lkjhg",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "aaaaaaaaaaaaaa",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "1234567890",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "lorem ipsum dolor sit",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "!!!???",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "😀😀😀",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "∆∂ƒ©˙",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "kkkkkkk zzzzz",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "qqqqqqqqqqqqqqqqqqqq",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "zzxxccvv bbnnmm",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "plmoknijb",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "wxyzzy",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "hjkl hjkl hjkl",
+  "cat": "hard_gibberish"
+ },
+ {
+  "q": "ptkfgh qwrt",
+  "cat": "hard_gibberish"
+ }
+]

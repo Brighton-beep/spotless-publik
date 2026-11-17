@@ -1,0 +1,17 @@
+[
+ {"title": "Knockin' On Heaven's Door (Visualizer)", "artists": "Bob Dylan", "is_video": true, "studio": true},
+ {"title": "Hotel California (Live 1976)", "artists": "Eagles", "is_video": true, "studio": false, "version": "live"},
+ {"title": "Hotel California (2013 Remaster)", "artists": "Eagles", "is_video": false, "studio": true},
+ {"title": "Blinding Lights (Official Video)", "artists": "The Weeknd", "is_video": true, "studio": true},
+ {"title": "Pray For Me (Official Lyric Video)", "artists": "The Weeknd & Kendrick Lamar", "is_video": true, "studio": true},
+ {"title": "Take My Breath (Official Music Video)", "artists": "The Weeknd", "is_video": true, "studio": true},
+ {"title": "Dusk Till Dawn (Radio Edit) (feat. Sia)", "artists": "ZAYN", "is_video": false, "studio": true},
+ {"title": "All Too Well (Taylor's Version)", "artists": "Taylor Swift", "is_video": false, "studio": true},
+ {"title": "Stressed Out (Slowed & Reverb)", "artists": "SCXLETTE", "is_video": false, "studio": false, "version": "slowed"},
+ {"title": "Save Your Tears - Remake Cover", "artists": "renewwed, capella & Tazzy", "is_video": false, "studio": false, "version": "cover"},
+ {"title": "Can't Feel My Face (Originally Perfomed By The Weeknd)", "artists": "ZZang KARAOKE", "is_video": false, "studio": false, "version": "karaoke"},
+ {"title": "Espresso (Sped Up)", "artists": "Sabrina Carpenter", "is_video": false, "studio": false, "version": "sped_up"},
+ {"title": "Creep (Acoustic)", "artists": "Radiohead", "is_video": false, "studio": false, "version": "acoustic"},
+ {"title": "Cold Heart (PNAU Remix)", "artists": "Elton John & Dua Lipa", "is_video": false, "studio": false, "version": "remix", "admitted": true},
+ {"title": "Dancin - Krono Remix (Official Video) (feat. Luvli)", "artists": "Aaron Smith", "is_video": true, "studio": false, "version": "remix", "admitted": true}
+]

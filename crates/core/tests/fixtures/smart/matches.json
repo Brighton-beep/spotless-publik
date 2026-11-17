@@ -1,0 +1,74 @@
+[
+  {"name": "1 karaoke cover loses to the original",
+   "src": {"title": "Fantasy", "artists": ["Earth, Wind & Fire"], "album": "All 'N All", "duration": "3:48"},
+   "cands": [
+     {"id": "karaoke", "title": "Fantasy (As Made Famous By Earth, Wind & Fire)", "artists": "The Karaoke Crew", "duration": "3:47"},
+     {"id": "ewf", "title": "Fantasy", "artists": "Earth, Wind & Fire", "album": "All 'N All", "duration": "3:48"}
+   ],
+   "pick": "ewf", "tier": "matched", "gated": {"karaoke": ["version", "artist"]}},
+  {"name": "2 only the karaoke cover",
+   "src": {"title": "Fantasy", "artists": ["Earth, Wind & Fire"], "duration": "3:48"},
+   "cands": [
+     {"id": "karaoke", "title": "Fantasy (As Made Famous By Earth, Wind & Fire)", "artists": "The Karaoke Crew", "duration": "3:47"}
+   ],
+   "pick": "karaoke", "tier": "check"},
+  {"name": "3 live source wants live",
+   "src": {"title": "Creep (Live)", "artists": ["Radiohead"], "duration": "4:20"},
+   "cands": [
+     {"id": "studio", "title": "Creep", "artists": "Radiohead", "duration": "3:59"},
+     {"id": "live", "title": "Creep (Live)", "artists": "Radiohead", "duration": "4:20"}
+   ],
+   "pick": "live", "tier": "matched"},
+  {"name": "4 remaster is the same recording",
+   "src": {"title": "Song", "artists": ["X"], "duration": "3:30"},
+   "cands": [
+     {"id": "plain", "title": "Song", "artists": "X", "duration": "3:30"},
+     {"id": "rem", "title": "Song - 2011 Remaster", "artists": "X", "duration": "3:30"}
+   ],
+   "pick": "plain", "tier": "matched"},
+  {"name": "5 radio edit vs album cut",
+   "src": {"title": "Song (Radio Edit)", "artists": ["X"], "duration": "3:30"},
+   "cands": [
+     {"id": "album", "title": "Song", "artists": "X", "duration": "4:40"}
+   ],
+   "pick": "album", "tier": "check"},
+  {"name": "6 featured artist parsed from the title",
+   "src": {"title": "Song", "artists": ["A", "B"], "duration": "3:00"},
+   "cands": [
+     {"id": "f", "title": "Song (feat. B)", "artists": "A", "duration": "3:00"}
+   ],
+   "pick": "f", "tier": "matched"},
+  {"name": "7 Taylor's Version vs the 2012 cut",
+   "src": {"title": "All Too Well (Taylor's Version)", "artists": ["Taylor Swift"], "duration": "5:29"},
+   "cands": [
+     {"id": "old", "title": "All Too Well", "artists": "Taylor Swift", "duration": "5:29"}
+   ],
+   "pick": "old", "tier": "check"},
+  {"name": "11 two different songs too close to call",
+   "src": {"title": "Heart", "artists": ["X"], "duration": "3:00"},
+   "cands": [
+     {"id": "a", "title": "Heart", "artists": "X", "duration": "3:00"},
+     {"id": "b", "title": "Hearts", "artists": "X", "duration": "3:00"}
+   ],
+   "pick": "a", "tier": "check"},
+  {"name": "UGC video titled Artist - Title",
+   "src": {"title": "Fantasy", "artists": ["Earth, Wind & Fire"], "duration": "3:48"},
+   "cands": [
+     {"id": "v", "title": "Earth, Wind & Fire - Fantasy (Official Video)", "artists": "EarthWindandFireVEVO", "duration": "3:50", "video": true}
+   ],
+   "pick": "v", "tier": "matched"},
+  {"name": "Tribute band with the right title",
+   "src": {"title": "Bohemian Rhapsody", "artists": ["Queen"], "duration": "5:55"},
+   "cands": [
+     {"id": "tribute", "title": "Bohemian Rhapsody", "artists": "Queen Tribute Band", "duration": "5:54"},
+     {"id": "queen", "title": "Bohemian Rhapsody (Remastered 2011)", "artists": "Queen", "duration": "5:55"}
+   ],
+   "pick": "queen", "tier": "matched"},
+  {"name": "Sped up loses to the original",
+   "src": {"title": "Paint The Town Red", "artists": ["Doja Cat"], "duration": "3:51"},
+   "cands": [
+     {"id": "sped", "title": "Paint The Town Red (Sped Up)", "artists": "Doja Cat", "duration": "3:51"},
+     {"id": "orig", "title": "Paint The Town Red", "artists": "Doja Cat", "duration": "3:51"}
+   ],
+   "pick": "orig", "tier": "matched"}
+]

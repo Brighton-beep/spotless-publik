@@ -1,0 +1,28 @@
+# Nothing is forced here any more, deliberately.
+#
+# This file used to set GDK_BACKEND=x11 and WEBKIT_DISABLE_DMABUF_RENDERER=1 for every `cargo run`,
+# which made the dev build the only one that got the Fedora/NVIDIA rendering workarounds, and made
+# them impossible to override from the shell: cargo's non-forced [env] sets a variable precisely
+# when the environment does not have it, so `env -u WEBKIT_DISABLE_DMABUF_RENDERER cargo tauri dev`
+# silently got it back. That trap cost a wrong diagnosis once already: the "native Wayland hangs
+# with the DMABUF renderer on" row in 25da402 was really measured on XWayland, because this file
+# was still forcing GDK_BACKEND=x11 when it was taken.
+#
+# Both variables now live in `src-tauri/src/lib.rs` `run()`, gated on the driver actually being
+# NVIDIA, so dev, rpm and AppImage builds behave identically and anyone whose driver differs keeps
+# GPU compositing. GDK_BACKEND is set nowhere: native Wayland is the only backend where the DMABUF
+# renderer works on NVIDIA at all.
+#
+# To check which renderer a run actually used, read the app's own diagnostics (Settings ▸ About) or
+# the startup log. Do NOT read /proc/<pid>/environ: it is the environment the process was *execed*
+# with and is never updated, so nothing `std::env::set_var` does in `run()` ever shows up there,
+# and WebKit's process launcher filters the web process's environment on top of that.
+
+# ── iOS (crates/core, docs/streams/ios-core.md) ──
+# rustypipe embeds QuickJS (rquickjs), which ships no pregenerated bindings for iOS, so its bindings
+# are generated at build time. bindgen hands libclang Rust's target triple, which clang rejects
+# (`aarch64-apple-ios-sim`), and no SDK. These give it Clang's triple and Xcode's SDKs. Not forced:
+# an Xcode installed elsewhere overrides them from the shell.
+[env]
+BINDGEN_EXTRA_CLANG_ARGS_aarch64_apple_ios_sim = "--target=arm64-apple-ios18.0-simulator -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk"
+BINDGEN_EXTRA_CLANG_ARGS_aarch64_apple_ios = "--target=arm64-apple-ios18.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"

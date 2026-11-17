@@ -1,0 +1,28 @@
+# S3 spike: the cipher (sig + n) in an in-process JS engine instead of the hidden webview.
+# Standalone (own [workspace]) so it does not touch the root workspace S2 is reshaping.
+[package]
+name = "spike-js"
+version = "0.0.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+rquickjs = { version = "0.9", optional = true }
+innertube = { path = "../../crates/innertube" }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+urlencoding = "2"
+
+[features]
+default = ["jsc", "quickjs"]
+jsc = []
+quickjs = ["dep:rquickjs"]
+# rquickjs-sys ships no pregenerated bindings for iOS targets: generate them (needs libclang,
+# which Xcode provides). Build iOS with `--features quickjs-bindgen`.
+quickjs-bindgen = ["quickjs", "rquickjs/bindgen"]
+
+[workspace]

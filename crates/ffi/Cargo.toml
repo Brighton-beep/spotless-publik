@@ -1,0 +1,25 @@
+[package]
+name = "encore-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "UniFFI surface of encore-core for the iOS app (Swift bindings: ios/EncoreCore)"
+
+[lib]
+name = "encore_ffi"
+# staticlib → EncoreCoreFFI.xcframework for iOS; cdylib → the host-side library uniffi-bindgen
+# reads the interface metadata from.
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[dependencies]
+encore-core = { path = "../core" }
+innertube = { path = "../innertube" }
+player = { path = "../player" }
+libmpv2 = "4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uniffi = "0.29.5"

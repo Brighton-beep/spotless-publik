@@ -1,0 +1,83 @@
+# Spotless checks on every pull request and push to main. Two light jobs:
+#   ui    svelte-check and the UI self-checks (ui/src/lib/*.check.ts), on Linux (no Rust needed)
+#   rust  cargo test for the shared core crates (encore-core, innertube, player, encore-ffi: the
+#         logic behind both the Mac and the iPhone app) on macOS, linked against the same pinned
+#         IINA libmpv the release bundles (scripts/macos/fetch-libmpv.sh). Network tests are
+#         #[ignore]d and stay out.
+# Not here on purpose: the Tauri app crate (a full WebKit/Tauri compile, covered by the release
+# build) and the iOS app (Xcode, simulator).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The pnpm the lockfile was written with; ui/package.json has no packageManager field.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.18.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+
+      - name: svelte-check
+        working-directory: ui
+        run: pnpm check
+
+      - name: UI self-checks
+        working-directory: ui
+        run: pnpm test
+
+  rust:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-core
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/encore-cache
+          key: libmpv-iina-arm64-${{ hashFiles('scripts/macos/fetch-libmpv.sh') }}
+
+      # IINA's dylibs use @rpath install names: LIBRARY_PATH for the link, DYLD_FALLBACK_LIBRARY_PATH
+      # so the test binaries find them at run time.
+      - name: libmpv
+        env:
+          ENCORE_CACHE: ${{ runner.temp }}/encore-cache
+        run: |
+          LIBDIR="$(scripts/macos/fetch-libmpv.sh --arch arm64 | tail -1)"
+          {
+            echo "LIBRARY_PATH=$LIBDIR"
+            echo "DYLD_FALLBACK_LIBRARY_PATH=$LIBDIR"
+          } >> "$GITHUB_ENV"
+
+      - name: cargo test (core crates)
+        run: cargo test --locked -p encore-core -p innertube -p player -p encore-ffi

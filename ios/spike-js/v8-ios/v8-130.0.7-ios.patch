@@ -1,0 +1,62 @@
+--- a/build.rs
++++ b/build.rs
+@@ -237,6 +237,20 @@
+       gn_args.push(arg.to_string());
+     }
+   }
++  // iOS (spike S3): no Linux sysroot; tell GN the OS + environment.
++  if target_os == "ios" {
++    let target_triple = env::var("TARGET").unwrap();
++    gn_args.push(r#"target_os="ios""#.to_string());
++    gn_args.push(r#"target_cpu="arm64""#.to_string());
++    gn_args.push(r#"v8_target_cpu="arm64""#.to_string());
++    if target_triple.ends_with("-sim") {
++      gn_args.push(r#"target_environment="simulator""#.to_string());
++    } else {
++      gn_args.push(r#"target_environment="device""#.to_string());
++    }
++    gn_args.push("ios_enable_code_signing=false".to_string());
++    gn_args.push("treat_warnings_as_errors=false".to_string());
++  } else
+   // cross-compilation setup
+   if target_arch == "aarch64" {
+     gn_args.push(r#"target_cpu="arm64""#.to_string());
+--- a/build/toolchain/mac/BUILD.gn
++++ b/build/toolchain/mac/BUILD.gn
+@@ -24,7 +24,7 @@
+ 
+       if (target_os == "ios") {
+         # Use LLD for the host part of a chrome/ios build.
+-        use_lld = true
++        use_lld = false  # S3 spike: bundled lld cannot read the Xcode 27 SDK .tbd files
+ 
+         # Override `is_component_build` for the host toolchain.
+         # See https://crbug.com/gn/286 for details why this is
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -402,7 +402,7 @@
+       ldflags += [ "-Wl,--fatal-warnings" ]
+     }
+     if (fatal_linker_warnings && is_apple) {
+-      ldflags += [ "-Wl,-fatal_warnings" ]
++      # S3 spike: ld64 warns about the missing Chromium libLTO; not fatal.
+     }
+   }
+ 
+--- a/third_party/libc++/src/include/math.h
++++ b/third_party/libc++/src/include/math.h
+@@ -299,6 +299,14 @@
+ 
+ #  if __has_include_next(<math.h>)
+ #    include_next <math.h>
++// S3 spike: Xcode 27 SDK math.h takes NAN/INFINITY from <float.h> (__need_infinity_nan),
++// which this libc++/clang's float.h does not provide.
++#    ifndef NAN
++#      define NAN __builtin_nanf("")
++#    endif
++#    ifndef INFINITY
++#      define INFINITY __builtin_inff()
++#    endif
+ #  endif
+ 
+ #  ifdef __cplusplus

@@ -1,0 +1,95 @@
+name: Encore
+options:
+  bundleIdPrefix: app.spotless
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+packages:
+  # The shared Rust core (UniFFI) + MPVKit. Build its binary first: scripts/build-ios-core.sh --release
+  EncoreCore:
+    path: ../EncoreCore
+  SnapshotTesting:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    exactVersion: 1.19.7
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "12"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Encore:
+    type: application
+    platform: iOS
+    sources:
+      - path: Encore
+      # The desktop devmock fixtures (real YouTube Music captures), bundled as a folder.
+      - path: ../../ui/src/lib/devmock/fixtures
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: EncoreCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.spotlessmusic.ios
+        PRODUCT_NAME: Encore
+        INFOPLIST_FILE: Encore/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Brand pink (Palette.accent) as the system tint for alerts, menus and stock controls.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+  EncoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: EncoreTests
+        excludes: ["__Snapshots__/**"]
+    dependencies:
+      - target: Encore
+      - package: SnapshotTesting
+      - package: EncoreCore
+        link: false
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Encore.app/Encore
+  EncoreUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [EncoreUITests]
+    dependencies:
+      - target: Encore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Encore
+  # End-to-end flows on the REAL core (network, audio at volume 0): scheme EncoreE2E, scripts/e2e.sh.
+  EncoreE2ETests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [EncoreE2ETests]
+    dependencies:
+      - target: Encore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Encore
+schemes:
+  EncoreE2E:
+    build:
+      targets:
+        Encore: all
+        EncoreE2ETests: [test]
+    test:
+      targets: [EncoreE2ETests]
+      environmentVariables:
+        E2E_SHOTS: $(SRCROOT)/build/e2e/shots
+  Encore:
+    build:
+      targets:
+        Encore: all
+    test:
+      targets: [EncoreTests, EncoreUITests]

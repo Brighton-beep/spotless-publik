@@ -1,0 +1,387 @@
+[
+ {
+  "title": "Fantasy (As Made Famous By Earth, Wind & Fire)",
+  "artist": "The Karaoke Crew",
+  "base": "fantasy",
+  "version": "karaoke"
+ },
+ {
+  "title": "Fantasy",
+  "artist": "Earth, Wind & Fire",
+  "base": "fantasy",
+  "version": "studio"
+ },
+ {
+  "title": "Earth, Wind & Fire - Fantasy (Official Video)",
+  "artist": "Earth, Wind & Fire",
+  "base": "fantasy",
+  "version": "studio",
+  "video_marker": true
+ },
+ {
+  "title": "Panama - 2015 Remaster",
+  "artist": "Van Halen",
+  "base": "panama",
+  "version": "studio",
+  "remaster": true
+ },
+ {
+  "title": "Bohemian Rhapsody (Remastered 2011)",
+  "artist": "Queen",
+  "base": "bohemian rhapsody",
+  "version": "studio",
+  "remaster": true
+ },
+ {
+  "title": "Get Lucky (feat. Pharrell Williams & Nile Rodgers)",
+  "artist": "Daft Punk",
+  "base": "get lucky",
+  "version": "studio",
+  "feat": [
+   "pharrell williams",
+   "nile rodgers"
+  ]
+ },
+ {
+  "title": "Mask Off ft. Kendrick Lamar",
+  "artist": "Future",
+  "base": "mask off",
+  "version": "studio",
+  "feat": [
+   "kendrick lamar"
+  ]
+ },
+ {
+  "title": "Stay (with Justin Bieber)",
+  "artist": "The Kid LAROI",
+  "base": "stay",
+  "version": "studio",
+  "feat": [
+   "justin bieber"
+  ]
+ },
+ {
+  "title": "Creep - Acoustic",
+  "artist": "Radiohead",
+  "base": "creep",
+  "version": "acoustic"
+ },
+ {
+  "title": "Creep (Live)",
+  "artist": "Radiohead",
+  "base": "creep",
+  "version": "live"
+ },
+ {
+  "title": "Smells Like Teen Spirit (Live at Reading 1992)",
+  "artist": "Nirvana",
+  "base": "smells like teen spirit",
+  "version": "live"
+ },
+ {
+  "title": "About A Girl (MTV Unplugged)",
+  "artist": "Nirvana",
+  "base": "about a girl",
+  "version": "live"
+ },
+ {
+  "title": "Despacito (En Vivo)",
+  "artist": "Luis Fonsi",
+  "base": "despacito",
+  "version": "live"
+ },
+ {
+  "title": "Live Forever",
+  "artist": "Oasis",
+  "base": "live forever",
+  "version": "studio"
+ },
+ {
+  "title": "Cover Me",
+  "artist": "Bruce Springsteen",
+  "base": "cover me",
+  "version": "studio"
+ },
+ {
+  "title": "Titanium (feat. Sia) [Alesso Remix]",
+  "artist": "David Guetta",
+  "base": "titanium",
+  "version": "remix",
+  "feat": [
+   "sia"
+  ]
+ },
+ {
+  "title": "Levels (Skrillex Remix)",
+  "artist": "Avicii",
+  "base": "levels",
+  "version": "remix"
+ },
+ {
+  "title": "Strobe (Club Edit)",
+  "artist": "deadmau5",
+  "base": "strobe",
+  "version": "studio",
+  "edit": true
+ },
+ {
+  "title": "Animals (Original Mix)",
+  "artist": "Martin Garrix",
+  "base": "animals",
+  "version": "studio"
+ },
+ {
+  "title": "Animals (Extended Mix)",
+  "artist": "Martin Garrix",
+  "base": "animals",
+  "version": "extended"
+ },
+ {
+  "title": "Satisfaction (Oliver Heldens Mix)",
+  "artist": "Benny Benassi",
+  "base": "satisfaction",
+  "version": "remix"
+ },
+ {
+  "title": "Blinding Lights (Radio Edit)",
+  "artist": "The Weeknd",
+  "base": "blinding lights",
+  "version": "studio",
+  "edit": true
+ },
+ {
+  "title": "Love Story (Taylor's Version)",
+  "artist": "Taylor Swift",
+  "base": "love story",
+  "version": "re_recorded"
+ },
+ {
+  "title": "Shake It Off (Instrumental)",
+  "artist": "Taylor Swift",
+  "base": "shake it off",
+  "version": "instrumental"
+ },
+ {
+  "title": "Shake It Off (Karaoke Version)",
+  "artist": "Sing King",
+  "base": "shake it off",
+  "version": "karaoke"
+ },
+ {
+  "title": "Shake It Off",
+  "artist": "Sing King",
+  "base": "shake it off",
+  "version": "karaoke"
+ },
+ {
+  "title": "Paint The Town Red (Sped Up)",
+  "artist": "Doja Cat",
+  "base": "paint the town red",
+  "version": "sped_up"
+ },
+ {
+  "title": "Snowfall - slowed + reverb",
+  "artist": "øneheart",
+  "base": "snowfall",
+  "version": "slowed"
+ },
+ {
+  "title": "Bad Apple!! Nightcore",
+  "artist": "Some Uploader",
+  "base": "bad apple nightcore",
+  "version": "nightcore"
+ },
+ {
+  "title": "Hallelujah (Cover)",
+  "artist": "Pentatonix",
+  "base": "hallelujah",
+  "version": "cover"
+ },
+ {
+  "title": "Smells Like Teen Spirit",
+  "artist": "Vitamin String Quartet",
+  "base": "smells like teen spirit",
+  "version": "cover"
+ },
+ {
+  "title": "Sweet Child O' Mine",
+  "artist": "Rockabye Baby!",
+  "base": "sweet child o mine",
+  "version": "cover"
+ },
+ {
+  "title": "Yesterday (Demo)",
+  "artist": "The Beatles",
+  "base": "yesterday",
+  "version": "demo"
+ },
+ {
+  "title": "Hey Jude (Official Video) [4K]",
+  "artist": "The Beatles",
+  "base": "hey jude",
+  "version": "studio",
+  "video_marker": true
+ },
+ {
+  "title": "Never Gonna Give You Up (Official Music Video)",
+  "artist": "Rick Astley",
+  "base": "never gonna give you up",
+  "version": "studio",
+  "video_marker": true
+ },
+ {
+  "title": "Dynamite (Lyrics)",
+  "artist": "BTS",
+  "base": "dynamite",
+  "version": "studio",
+  "video_marker": true
+ },
+ {
+  "title": "Snow (Hey Oh) (Single Version)",
+  "artist": "Red Hot Chili Peppers",
+  "base": "snow",
+  "version": "studio"
+ },
+ {
+  "title": "Me and Mrs. Jones (Single Version)",
+  "artist": "Billy Paul",
+  "base": "me and mrs jones",
+  "version": "studio"
+ },
+ {
+  "title": "(Intro)",
+  "artist": "The xx",
+  "base": "intro",
+  "version": "studio"
+ },
+ {
+  "title": "夜に駆ける",
+  "artist": "YOASOBI",
+  "base": "夜に駆ける",
+  "version": "studio"
+ },
+ {
+  "title": "Clair de Lune (Piano Version)",
+  "artist": "Someone",
+  "base": "clair de lune",
+  "version": "alternate"
+ },
+ {
+  "title": "Faded (8D Audio)",
+  "artist": "8D Tunes",
+  "base": "faded",
+  "version": "alternate",
+  "video_marker": true
+ },
+ {
+  "title": "Rolling in the Deep | Lyrics",
+  "artist": "Adele",
+  "base": "rolling in the deep",
+  "version": "studio",
+  "video_marker": true
+ },
+ {
+  "title": "Despacito - Remix",
+  "artist": "Luis Fonsi",
+  "base": "despacito",
+  "version": "remix"
+ },
+ {
+  "title": "Thinking Out Loud (Live at Wembley Stadium)",
+  "artist": "Ed Sheeran",
+  "base": "thinking out loud",
+  "version": "live"
+ },
+ {
+  "title": "bad guy (with Justin Bieber)",
+  "artist": "Billie Eilish",
+  "base": "bad guy",
+  "version": "studio",
+  "feat": [
+   "justin bieber"
+  ]
+ },
+ {
+  "title": "Lose Yourself (From \"8 Mile\" Soundtrack)",
+  "artist": "Eminem",
+  "base": "lose yourself",
+  "version": "studio"
+ },
+ {
+  "title": "Señorita",
+  "artist": "Shawn Mendes",
+  "base": "senorita",
+  "version": "studio"
+ },
+ {
+  "title": "PSY - GANGNAM STYLE (강남스타일) M/V",
+  "artist": "PSY",
+  "base": "gangnam style",
+  "version": "studio",
+  "video_marker": true
+ },
+ {
+  "title": "Wonderwall - Remastered",
+  "artist": "Oasis",
+  "base": "wonderwall",
+  "version": "studio",
+  "remaster": true
+ },
+ {
+  "title": "Run (Taylor's Version) (feat. Ed Sheeran) (From The Vault)",
+  "artist": "Taylor Swift",
+  "base": "run",
+  "version": "re_recorded",
+  "feat": [
+   "ed sheeran"
+  ]
+ },
+ {
+  "title": "Blinding Lights (Slowed + Reverb)",
+  "artist": "The Weeknd",
+  "base": "blinding lights",
+  "version": "slowed"
+ },
+ {
+  "title": "Heat Waves (Sped Up Version)",
+  "artist": "Glass Animals",
+  "base": "heat waves",
+  "version": "sped_up"
+ },
+ {
+  "title": "Toxic (Acoustic Cover)",
+  "artist": "Random Singer",
+  "base": "toxic",
+  "version": "cover"
+ },
+ {
+  "title": "Hotel California (Live on MTV, 1994)",
+  "artist": "Eagles",
+  "base": "hotel california",
+  "version": "live"
+ },
+ {
+  "title": "One More Time (Radio Edit)",
+  "artist": "Daft Punk",
+  "base": "one more time",
+  "version": "studio",
+  "edit": true
+ },
+ {
+  "title": "Bohemian Rhapsody - Remastered 2011",
+  "artist": "Queen",
+  "base": "bohemian rhapsody",
+  "version": "studio",
+  "remaster": true
+ },
+ {
+  "title": "Lean On (feat. MØ & DJ Snake)",
+  "artist": "Major Lazer",
+  "base": "lean on",
+  "version": "studio",
+  "feat": [
+   "mø",
+   "dj snake"
+  ]
+ }
+]
