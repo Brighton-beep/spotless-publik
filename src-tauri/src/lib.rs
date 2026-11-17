@@ -403,6 +403,7 @@ fn release_on_destroy(webview: &tauri::Webview) {
 fn keep_on_screen(w: &tauri::WebviewWindow) {
     let (Ok(p), Ok(size)) = (w.outer_position(), w.outer_size()) else { return };
     if mini::on_a_display(w, p, size) {
+        fit_work_area(w, p, size);
         return;
     }
     tracing::info!(x = p.x, y = p.y, "main window restored off-screen, centering it");
@@ -416,6 +417,34 @@ fn keep_on_screen(w: &tauri::WebviewWindow) {
     if maximized {
         let _ = w.maximize();
     }
+}
+
+/// The whole window inside the work area of the display it's on: a window whose middle is on
+/// screen but whose bottom (or title bar) is under the Dock or past the edge gets shrunk to fit and
+/// centred. First launch from the DMG once opened with the welcome dialog below the screen.
+fn fit_work_area(w: &tauri::WebviewWindow, p: tauri::PhysicalPosition<i32>, size: tauri::PhysicalSize<u32>) {
+    let Ok(Some(m)) = w.current_monitor() else { return };
+    let (a, sz) = (m.work_area().position, m.work_area().size);
+    if fits_inside((p.x, p.y, size.width, size.height), (a.x, a.y, sz.width, sz.height)) {
+        return;
+    }
+    tracing::info!(x = p.x, y = p.y, "main window not fully on screen, fitting it");
+    if w.is_maximized().unwrap_or(false) || w.is_fullscreen().unwrap_or(false) {
+        return;
+    }
+    let scale = m.scale_factor();
+    let screen = sz.to_logical::<f64>(scale);
+    let cur = size.to_logical::<f64>(scale);
+    let _ = w.set_size(tauri::LogicalSize::new(cur.width.min(screen.width), cur.height.min(screen.height)));
+    let _ = w.center();
+}
+
+/// `(x, y, w, h)` window fully inside `(x, y, w, h)` area, with a few pixels of slack for shadows.
+fn fits_inside(win: (i32, i32, u32, u32), area: (i32, i32, u32, u32)) -> bool {
+    const SLACK: i64 = 8;
+    let (wx, wy, ww, wh) = (win.0 as i64, win.1 as i64, win.2 as i64, win.3 as i64);
+    let (ax, ay, aw, ah) = (area.0 as i64, area.1 as i64, area.2 as i64, area.3 as i64);
+    wx >= ax - SLACK && wy >= ay - SLACK && wx + ww <= ax + aw + SLACK && wy + wh <= ay + ah + SLACK
 }
 
 /// Set once the main window has been given its first-launch size. From then on the window-state
@@ -444,7 +473,14 @@ fn default_window_size(sw: f64, sh: f64) -> (f64, f64) {
 
 #[cfg(test)]
 mod default_size_tests {
-    use super::default_window_size;
+    use super::{default_window_size, fits_inside};
+    #[test]
+    fn a_window_past_the_bottom_does_not_fit() {
+        let area = (0, 74, 3456, 2160);
+        assert!(fits_inside((346, 150, 3110, 1950), area));
+        assert!(!fits_inside((346, 1400, 3110, 1950), area), "middle on screen, bottom under the Dock");
+        assert!(!fits_inside((-400, 150, 3110, 1950), area));
+    }
     #[test]
     fn default_size_follows_the_display() {
         assert_eq!(default_window_size(1440.0, 875.0), (1296.0, 832.0));
