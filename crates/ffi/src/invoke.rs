@@ -189,7 +189,8 @@ pub(crate) async fn dispatch(st: &Arc<AppState>, cmd: &str, a: Args) -> Result<V
             let (_, semitones, reverb) = st.player.playback_params();
             let semitones = a.get::<Option<i32>>("semitones")?.unwrap_or(semitones);
             let reverb = a.get::<Option<player::Reverb>>("reverb")?.unwrap_or(reverb);
-            ok(api::set_playback_params(st, a.get("speed")?, semitones, reverb).await?)
+            let target = a.get::<Option<String>>("target")?;
+            ok(api::set_playback_params(st, a.get("speed")?, semitones, reverb, target).await?)
         }
         "set_volume" => {
             let v: i64 = a.get("volume")?;

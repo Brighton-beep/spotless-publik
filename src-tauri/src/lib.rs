@@ -1325,6 +1325,7 @@ pub fn run() {
             commands::lyrics_providers,
             commands::lyrics_parse,
             commands::theater_fullscreen,
+            commands::title_bar_double_click,
             commands::can_self_update,
             commands::open_external,
             commands::quit_app,

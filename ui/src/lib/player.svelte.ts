@@ -3,6 +3,7 @@
 // context/11 UI contract — this module only calls commands / subscribes to events.
 import { browser } from '$app/environment';
 import * as api from './api';
+import { videoHeightFor } from './videosync';
 import type {
 	Account,
 	AccountIdentity,
@@ -94,18 +95,12 @@ export function setAutoplay(on: boolean): void {
  *  evicted here is still a cheap answer there. */
 const videoUrls = new Map<string, Promise<string | null>>();
 
-/** The picture ladder YouTube publishes, snapped up so the box is never upscaled, capped at 720
- *  because that is already more than the player view's box gets on a 1080p screen. What the window
- *  keeps from the box's height, at the default root font size, mirrors NowPlaying.svelte's two
- *  layouts. Original: `176` is `11rem`, the chrome above and below the box (the `--vid` calc).
- *  New layout: `368` is the titlebar and the player bar (~110), the view's top row and padding
- *  (80), and the lyric line and title block under the picture (11rem, `VIDEO_SIDE`). If any of
- *  those changes height, this does. */
+/** The picture height to resolve (videosync.ts `videoHeightFor`). Sized for the screen, not the
+ *  player view's box: the URL is resolved once per video and the same stream fills Full screen.
+ *  The box-sized ladder this replaced asked by CSS pixels and stopped at 360/480p in an ordinary
+ *  window, which on a Retina Mac is the low-quality picture the owner saw. */
 export function wantedVideoHeight() {
-	const px = appearance.classicPlayer
-		? (window.innerHeight - 176) * 0.85
-		: window.innerHeight - 368;
-	return [360, 480, 720].find((h) => h >= px) ?? 720;
+	return videoHeightFor(window.screen?.height || window.innerHeight, window.devicePixelRatio || 1);
 }
 
 /** The loopback URL for a track's music video, resolving it at most once. */
@@ -937,8 +932,13 @@ export function wheelVolume(e: WheelEvent) {
  * Session effects (the "Advanced" dialog). Show confirmed values while Rust applies an atomic
  * update; a missing pitch/reverb filter leaves the previous settings intact.
  */
-export function setTempoPitch(speed: number, semitones: number, reverb = playback.reverb) {
-	return api.setPlaybackParams(speed, semitones, reverb).catch((e) => {
+export function setTempoPitch(
+	speed: number,
+	semitones: number,
+	reverb = playback.reverb,
+	target?: api.SpeedTarget
+) {
+	return api.setPlaybackParams(speed, semitones, reverb, target).catch((e) => {
 		toast.error(String(e));
 		playback.reverb = { ...playback.reverb }; // Discard a slider draft if Rust refused it.
 	});

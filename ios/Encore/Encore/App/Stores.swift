@@ -471,8 +471,7 @@ final class AppModel {
                 player.changeSerial += 1
                 if let s = player.queue.items.first(where: { $0.videoId == n.videoId }) { home.touchSong(s) }
             }
-            player.now = n
-            applyEffects(for: n.videoId)
+            player.now = n // the core puts this item's own speed on (speeds.rs)
         case .position(let p): player.position = p
         case .duration(let d): player.duration = d
         case .playbackState(let paused): player.paused = paused
@@ -504,26 +503,15 @@ final class AppModel {
         case .importProgress: break // the import screen polls `importStatus` while open
         // Spotify keeps one speed for podcasts; music has its own session effects (`effects`).
         // Only an episode's rate is the remembered one.
-        case .playbackParams(let e): appliedEffects = e; if currentIsEpisode { settings.speed = e.speed }
+        case .playbackParams(let e): if currentIsEpisode { settings.speed = e.speed }
         case .unknown(let name): account.handle(event: name)
         }
         player.timeTap() // stream: instant
     }
 
-    @ObservationIgnored private var appliedEffects = PlaybackEffects.original
     private var currentIsEpisode: Bool {
         guard let id = player.now?.videoId else { return false }
         return player.queue.items.first { $0.videoId == id }?.isEpisode == true
-    }
-
-    /// Episodes play at the saved podcast speed (`episode_speed`, kept across launches) with no
-    /// pitch or reverb; music plays with the session's tempo, pitch and reverb (`effects`).
-    func applyEffects(for videoId: String) {
-        let episode = player.queue.items.first { $0.videoId == videoId }?.isEpisode == true
-        let want = episode ? PlaybackEffects(speed: settings.speed) : effects
-        guard want != appliedEffects else { return }
-        appliedEffects = want
-        player.actions.run("speed", "Couldn't change the speed") { [core] in try await core.setPlaybackParams(want) }
     }
 
     /// Speed & pitch (music): applies now unless an episode is playing, and stays for every song
@@ -531,8 +519,7 @@ final class AppModel {
     func setEffects(_ e: PlaybackEffects) {
         let before = effects
         effects = e
-        guard !currentIsEpisode, e != appliedEffects else { return }
-        appliedEffects = e
+        // Always to the core, as the music's: it applies them now only if a song is playing.
         player.actions.run("effects", "Couldn't change the sound", revert: { [weak self] in self?.effects = before }) { [core] in
             try await core.setPlaybackParams(e)
         }

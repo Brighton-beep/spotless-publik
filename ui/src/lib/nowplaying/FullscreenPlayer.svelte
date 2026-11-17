@@ -2,7 +2,7 @@
 	/**
 	 * Spotify full-screen mode (lyrics-and-expanded-player.md "Fullscreen"): the window goes
 	 * fullscreen (Rust `theater_fullscreen`, which restores the maximised state on exit), black →
-	 * cover-colour gradient (or the music video edge to edge). Top-left "Playing from" + context;
+	 * cover-colour gradient (or the music video edge to edge). Top-left Back + "Playing from" + context;
 	 * top-right lyrics toggle + exit. Bottom-left cover 120 + title 48/800 + artists 16 + like;
 	 * then the progress bar and the full controls row (play 56px), volume at the right.
 	 * Lyrics toggle shows the lyrics over the stage. Mouse idle 3s hides the chrome (300ms fade)
@@ -48,6 +48,7 @@
 	import RepeatOnceIcon from 'phosphor-svelte/lib/RepeatOnceIcon';
 	import MicrophoneStageIcon from 'phosphor-svelte/lib/MicrophoneStageIcon';
 	import CornersInIcon from 'phosphor-svelte/lib/CornersInIcon';
+	import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
 	import PlusCircleIcon from 'phosphor-svelte/lib/PlusCircleIcon';
 	import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
 	import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
@@ -205,10 +206,21 @@
 			? 'opacity-0'
 			: 'opacity-100'}"
 	>
-		<div class="min-w-0">
+		<div class="flex min-w-0 items-center gap-4">
+			<!-- Back: the clear way out, same as the exit button at the right (and Esc). -->
+			<IconButton
+				icon={CaretLeftIcon}
+				label="Back"
+				tooltip="Back (Esc)"
+				tooltipSide="bottom"
+				tone="white"
+				onclick={close}
+			/>
 			{#if context}
-				<div class="text-xs font-bold tracking-[0.1em] text-white/70 uppercase">Playing from</div>
-				<div class="truncate text-base font-bold">{context}</div>
+				<div class="min-w-0">
+					<div class="text-xs font-bold tracking-[0.1em] text-white/70 uppercase">Playing from</div>
+					<div class="truncate text-base font-bold">{context}</div>
+				</div>
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">

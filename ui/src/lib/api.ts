@@ -455,9 +455,11 @@ export interface Reverb {
 }
 // Lives with the presets, which a Node self-check imports without this module's Tauri imports.
 export { DEFAULT_REVERB } from './effect-presets';
-/** Session-only tempo, pitch, and independent reverb controls. */
-export const setPlaybackParams = (speed: number, semitones: number, reverb: Reverb) =>
-	invoke<void>('set_playback_params', { speed, semitones, reverb });
+/** Tempo, pitch, and independent reverb controls. Music and spoken word keep separate speeds in the
+ *  core (speeds.rs): `target` says which one this is, else whatever is playing. */
+export type SpeedTarget = 'music' | 'episode';
+export const setPlaybackParams = (speed: number, semitones: number, reverb: Reverb, target?: SpeedTarget) =>
+	invoke<void>('set_playback_params', { speed, semitones, reverb, target });
 export const onPlaybackParams = (cb: (p: { speed: number; semitones: number; reverb: Reverb }) => void) =>
 	listen<{ speed: number; semitones: number; reverb: Reverb }>('playback-params', (e) => cb(e.payload));
 export const getQueue = () => invoke<QueueState>('get_queue');
@@ -1148,6 +1150,8 @@ export const lyricsProviders = () => invoke<LyricsProvider[]>('lyrics_providers'
  *  maximized state undone first and the frame recalculated after, in that order, on the main
  *  thread. Rust also puts the maximized state back when theater closes. */
 export const theaterFullscreen = (on: boolean) => invoke<void>('theater_fullscreen', { on });
+/** macOS "Double-click a window's title bar to": "Maximize"/"Fill" (zoom), "Minimize" or "None". */
+export const titleBarDoubleClick = () => invoke<string>('title_bar_double_click');
 
 // ── stream: smart ── (src-tauri/src/smart, docs/streams/smart.md) ─────────────────────────────
 

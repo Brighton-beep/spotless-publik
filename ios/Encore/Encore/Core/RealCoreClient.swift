@@ -255,9 +255,13 @@ final class RealCoreClient: CoreClient, AudioEngineControl, @unchecked Sendable 
     func removeFromQueue(index: Int) async throws { _ = try await call("remove_from_queue", ["index": index]) }
     func moveInQueue(from: Int, to: Int) async throws { _ = try await call("move_in_queue", ["from": from, "to": to]) }
 
-    func setSpeed(_ rate: Double) async throws { _ = try await call("set_playback_params", ["speed": rate]) }
+    /// The core keeps the episode and music speeds apart and applies the playing item's own
+    /// (crates/core/src/speeds.rs), so each call says which one it changes.
+    func setSpeed(_ rate: Double) async throws {
+        _ = try await call("set_playback_params", ["speed": rate, "target": "episode"])
+    }
     func setPlaybackParams(_ e: PlaybackEffects) async throws {
-        _ = try await call("set_playback_params", ["speed": e.speed, "semitones": e.semitones, "reverb": e.reverb])
+        _ = try await call("set_playback_params", ["speed": e.speed, "semitones": e.semitones, "reverb": e.reverb, "target": "music"])
     }
     func seekRelative(_ seconds: Double) async throws {
         try await seek(position: max(0, core.position() + seconds))

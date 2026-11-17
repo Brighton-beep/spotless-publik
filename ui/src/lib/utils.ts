@@ -17,5 +17,16 @@ export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?:
  *  `onInteractOutside` should leave the dialog open. The bar's app buttons still dismiss it. */
 export function onWindowChrome(e: Event) {
 	const el = e.target as Element;
-	return !!(el.matches?.("[data-tauri-drag-region]") || el.closest?.("[data-window-control]"));
+	return !!(el.matches?.("[data-tauri-drag-region]") || el.closest?.("[data-window-control]") || isWindowDrag(el));
+}
+
+/** Controls (and the search field and its dropdown) inside a `data-window-drag` strip. */
+const INTERACTIVE =
+	'button, input, textarea, select, a, label, form, [role="button"], [role="option"], [role="listbox"], [role="menuitem"], [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
+
+/** True when a press lands on the empty part of a `data-window-drag` strip (the top bar), so it
+ *  moves the window. Unlike Tauri's `data-tauri-drag-region`, this covers the strip's empty child
+ *  wrappers too, and leaves every control clickable. */
+export function isWindowDrag(el: Element | null) {
+	return !!(el?.closest?.("[data-window-drag]") && !el.closest(INTERACTIVE));
 }

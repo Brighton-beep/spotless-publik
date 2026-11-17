@@ -235,14 +235,18 @@ pub async fn playback_clock(state: &Arc<AppState>) -> Result<Option<serde_json::
     Ok(state.playback_clock())
 }
 
-/// Session-only tempo (0.5–2.0), pitch (−12..=12 semitones), and reverb controls.
+/// Tempo (`player::SPEED_RANGE`), pitch (−12..=12 semitones), and reverb. `target` is `"music"`
+/// (the Speed & pitch sheet) or `"episode"` (the podcast speed menu); without one, whatever is
+/// playing. The two never share a speed (speeds.rs).
 pub async fn set_playback_params(
     state: &Arc<AppState>,
     speed: f64,
     semitones: i32,
     reverb: player::Reverb,
+    target: Option<String>,
 ) -> Result<(), String> {
-    state.set_playback_params(speed, semitones, reverb).await
+    let target = target.as_deref().and_then(crate::speeds::Target::parse);
+    state.set_playback_params(speed, semitones, reverb, target).await
 }
 
 pub async fn get_queue(state: &Arc<AppState>) -> Result<serde_json::Value, String> {

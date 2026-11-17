@@ -2,7 +2,8 @@
 	/**
 	 * Podcast playback speed ("1x"), Spotify's player-bar button while an episode plays and the
 	 * Now Playing episode card's control. Opens a kit menu: 0.5x … 3x, the current one checked.
-	 * The speed is the session tempo (`setTempoPitch`), as the podcasts stream specifies.
+	 * The speed is the spoken-word speed (`setTempoPitch(..., 'episode')`): the core keeps it apart
+	 * from the music's (speeds.rs), so a 2x episode never makes the next song 2x.
 	 * Accent while off 1x.
 	 */
 	import { playback, setTempoPitch } from '$lib/player.svelte';
@@ -22,7 +23,7 @@
 				(s): MenuEntry => ({
 					label: label(s),
 					checked: Math.abs(s - speed) < 0.001,
-					onSelect: () => setTempoPitch(s, playback.semitones)
+					onSelect: () => setTempoPitch(s, 0, playback.reverb, 'episode')
 				})
 			)
 		];

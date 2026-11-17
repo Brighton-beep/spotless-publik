@@ -3,7 +3,7 @@
 	 * Top bar (shell-layout.md): 64px on black. macOS traffic lights float over its left end
 	 * (titleBarStyle Overlay), then back/forward, logo; centred: Home (48px circle) + search pill
 	 * (48px, 474px wide) with Browse; right: avatar menu (Settings, YouTube account — optional).
-	 * The whole bar is a window drag region except its controls.
+	 * The whole bar drags the window except its controls (`isWindowDrag`).
 	 */
 	import { afterNavigate, goto } from '$app/navigation';
 	import { creatorOf } from '$lib/discover/format';
@@ -22,6 +22,7 @@
 	import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
 	import { thumb } from '$lib/thumb';
 	import { win } from '$lib/win.svelte';
+	import { isWindowDrag } from '$lib/utils';
 	import Icon from '$lib/kit/Icon.svelte';
 	import IconButton from '$lib/kit/IconButton.svelte';
 	import Tooltip from '$lib/kit/Tooltip.svelte';
@@ -387,26 +388,38 @@
 			return null;
 		}
 	})();
-	// Double-click empty top bar = zoom, like a native title bar. Tauri's own drag-region script
-	// already zooms when the double-click lands directly on a `data-tauri-drag-region` element (on
-	// macOS on mouseup), so toggling here too zoomed and un-zoomed in one go: nothing happened.
-	// Only the empty bits it doesn't own (children without the attribute) are handled here.
-	function dblclick(e: MouseEvent) {
-		const t = e.target as HTMLElement;
-		if (t.closest('button, input, a, form, [role="button"], [role="option"], [role="listbox"]')) return;
-		if (t.hasAttribute('data-tauri-drag-region')) return;
-		w?.toggleMaximize();
+	// The empty top bar drags the window, and double-clicking it does what macOS's "Double-click a
+	// window's title bar to" setting says (zoom, minimise or nothing). Handled here rather than
+	// with Tauri's `data-tauri-drag-region`, which only counts presses on the element itself (not
+	// its empty wrappers) and always zooms. As in Tauri's script on macOS, the second click acts on
+	// mouseup, and only if the pointer didn't move (a double-click-and-drag doesn't zoom).
+	let down2: [number, number] | null = null;
+	function chromeDown(e: MouseEvent) {
+		if (e.button !== 0 || !isWindowDrag(e.target as Element)) return;
+		e.preventDefault();
+		if (e.detail === 2) down2 = [e.clientX, e.clientY];
+		else if (e.detail === 1) w?.startDragging().catch(() => {});
+	}
+	async function chromeUp(e: MouseEvent) {
+		const at = down2;
+		down2 = null;
+		if (e.button !== 0 || e.detail !== 2 || !at || !w || !isWindowDrag(e.target as Element)) return;
+		if (at[0] !== e.clientX || at[1] !== e.clientY) return;
+		const action = await api.titleBarDoubleClick().catch(() => 'Maximize');
+		if (action === 'Minimize') await w.minimize();
+		else if (action !== 'None') await w.toggleMaximize();
 	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <header
-	data-tauri-drag-region
+	data-window-drag
 	class="relative z-30 flex h-16 shrink-0 items-center justify-between px-2 select-none"
-	ondblclick={dblclick}
+	onmousedown={chromeDown}
+	onmouseup={chromeUp}
 >
 	<!-- Left: (traffic lights) back / forward / logo -->
-	<div class="flex items-center gap-2 {win.chrome === 'overlay' ? 'pl-[80px]' : 'pl-4'}" data-tauri-drag-region>
+	<div class="flex items-center gap-2 {win.chrome === 'overlay' ? 'pl-[80px]' : 'pl-4'}">
 		<IconButton
 			icon={CaretLeftIcon}
 			label="Go back"

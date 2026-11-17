@@ -108,7 +108,7 @@
 		pending = settings;
 		draft = {};
 		reverbDraft = {};
-		setTempoPitch(settings.speed, settings.semitones, settings.reverb);
+		setTempoPitch(settings.speed, settings.semitones, settings.reverb, 'music');
 	}
 	const setReverb = (patch: Partial<Reverb>) => commit({ ...base, reverb: { ...base.reverb, ...patch } });
 

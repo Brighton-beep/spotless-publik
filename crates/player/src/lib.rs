@@ -168,6 +168,11 @@ pub struct AudioDevice {
     pub description: String,
 }
 
+/// Every tempo the player takes. One range for every UI: the podcast speed menus (desktop and
+/// iPhone) go to 3x, the music Speed & pitch sliders stop at 2x. Rubber Band and mpv's
+/// `scaletempo2` both stretch well past 3x, so the bound is the menus', not the DSP's.
+pub const SPEED_RANGE: std::ops::RangeInclusive<f64> = 0.5..=3.0;
+
 /// Session reverb controls. Dry and wet are independent signal levels, not a crossfade.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -953,7 +958,8 @@ impl Player {
         Ok(())
     }
 
-    /// Tempo, 0.5–2.0. Rubber Band time-stretches without shifting pitch whenever speed != 1.
+    /// Tempo, within [`SPEED_RANGE`]. Rubber Band time-stretches without shifting pitch whenever
+    /// speed != 1.
     pub fn set_speed(&self, speed: f64) -> Result<(), Error> {
         let af = *self.decks.af.lock().unwrap();
         self.set_playback_params(speed, af.semitones, af.reverb)
@@ -974,7 +980,7 @@ impl Player {
         reverb: Reverb,
     ) -> Result<(), Error> {
         if !speed.is_finite()
-            || !(0.5..=2.0).contains(&speed)
+            || !SPEED_RANGE.contains(&speed)
             || !(-12..=12).contains(&semitones)
             || !(1..=6).contains(&reverb.preset)
             || reverb.dry > 100
@@ -2589,11 +2595,17 @@ mod tests {
         assert_eq!(p.decks.speed(), 0.8, "rejected effects changed crossfade timing");
         assert_eq!(af(), before, "a refused effect changed the existing chain");
         assert_eq!(p.mpv().get_property::<f64>("speed").unwrap(), 0.8);
-        for bad in [f64::NAN, f64::INFINITY, 0.0, 0.49, 3.0] {
+        for bad in [f64::NAN, f64::INFINITY, 0.0, 0.49, 3.01] {
             assert!(p.set_playback_params(bad, 0, reverb(0)).is_err());
         }
         p.set_playback_params(0.5, 0, reverb(0)).unwrap();
         assert_eq!(p.playback_params().0, 0.5);
+        // The podcast menu's top speeds (#speed>2: these were "Invalid playback effect values").
+        for fast in [2.5, 3.0] {
+            p.set_playback_params(fast, 0, reverb(0)).unwrap();
+            assert_eq!(p.playback_params().0, fast);
+            assert_eq!(p.decks.speed(), fast);
+        }
         p.set_playback_params(0.8, -3, reverb(3)).unwrap();
         assert!(p.set_playback_params(1.0, 13, reverb(0)).is_err());
         assert!(p.set_playback_params(1.0, 0, reverb(7)).is_err());

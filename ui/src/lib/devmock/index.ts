@@ -1209,7 +1209,8 @@ const handlers: Record<string, (a: Args) => unknown> = {
 	open_mini: () => null,
 	close_mini: () => null,
 	set_mini_compact: () => null,
-	theater_fullscreen: () => null
+	theater_fullscreen: () => null,
+	title_bar_double_click: () => 'Maximize'
 };
 
 // ── plugins (window, app, updater, dialog, clipboard, process, deep-link, webview) ────────────

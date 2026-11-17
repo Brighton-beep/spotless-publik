@@ -13,6 +13,8 @@
 		videoKey,
 		wantNow
 	} from '$lib/video.svelte';
+	import { IS_MAC } from '$lib/shortcuts';
+	import { GTK, MAC, jumped, seekTarget, steadyStep } from '$lib/videosync';
 
 	// --- Music videos (plan 031) -------------------------------------------------------------
 	// When the track *is* a music video, the player view draws the video instead of the artwork.
@@ -40,21 +42,12 @@
 	// past the target by what the re-buffer will cost. The first sync of a fresh element is one of
 	// those cases by definition: resolving the video costs a round trip, so mpv is already a second
 	// or two in before the element can seek at all.
-	/** Trim bands. A rate write is *not* free on WebKitGTK, whatever the steady-state measurement
-	 *  above says: WebKit's GStreamer backend implements a `playbackRate` change as a flushing
-	 *  seek, so every write drops the sink's buffers and shows as a flicker (#107). So the rate is
-	 *  written twice per correction at most, once to start it and once to end it, and never for
-	 *  the wobble that ~4 Hz sampling puts on `drift`. TRIM_TICKS is that guard: about two seconds
-	 *  of sustained out-of-band drift before a correction starts at all. */
-	const TRIM_FROM = 0.35;
-	const TRIM_TO = 0.15;
-	const TRIM_TICKS = 8;
-	/** Above this, trimming would take too long to sit through, so pay for one seek instead. */
-	const SEEK_FROM = 2.5;
-	/** The lead on an *unbuffered* seek: it aims past the re-buffer that seek is about to cost. A
-	 *  seek whose target is already buffered lands within a frame, so leading it would only
-	 *  overshoot. `bufferedAt` below is what tells the two apart. */
-	const SEEK_COST = 1;
+	/** The trim bands and seek lead, per engine (videosync.ts). A rate write is *not* free on
+	 *  WebKitGTK: its GStreamer backend implements a `playbackRate` change as a flushing seek that
+	 *  shows as a flicker (#107), so there the rate is written twice per correction at most and
+	 *  only after ~2 s out of band. macOS WebKit changes rate seamlessly, so its bands are tight
+	 *  enough that the picture never sits visibly behind the voice. */
+	const TUNE = IS_MAC ? MAC : GTK;
 	const SEEK_COOLDOWN = 6000;
 	/** Getting a fresh element onto the music. The first seek is unbuffered, so where it lands
 	 *  cannot be predicted, only measured: it costs about a second of re-buffering and mpv plays on
@@ -90,9 +83,9 @@
 	let lastSeek = 0;
 	/** A correction in progress, the speed it was picked against, and how many ticks running the
 	 *  drift has been out of band. Plain lets: nothing renders off them. */
-	let trimming = false;
-	let trimSpeed = 1;
-	let outOfBand = 0;
+	let trim = { trimming: false, trimSpeed: 1, outOfBand: 0 };
+	/** mpv's last tick, to tell a seek or chapter jump from the clock just running. */
+	let lastTick: { pos: number; at: number } | null = null;
 
 	/** Which track the URL below was fetched for. A plain let, so the fetch effect can read it
 	 *  without depending on itself. */
@@ -114,6 +107,7 @@
 		syncSeeks = 0;
 		syncStart = 0;
 		lastSeek = 0; // a new track may sync at once, whatever the last one was doing
+		lastTick = null;
 		// `dormant` is deliberately *not* reset here: it means "this window is hidden and past the
 		// grace", which a track change does not undo. Clearing it would start the next video track
 		// decoding into a window nobody is looking at. Coming back into view is what clears it, and
@@ -193,14 +187,6 @@
 		return playback.position + since * playback.speed;
 	}
 
-	/** Catch-up rate for a gap, picked once when the correction starts and held until it closes:
-	 *  re-picking it as the gap shrinks would cost a flush per band crossed. */
-	function trimFor(drift: number) {
-		const a = Math.abs(drift);
-		const k = a > 1.2 ? 0.5 : a > 0.5 ? 0.25 : 0.1;
-		return playback.speed * (1 + Math.sign(drift) * k);
-	}
-
 	/** Whether `t` is already downloaded, which is what decides if a seek there is nearly free or
 	 *  costs a round trip and a re-buffer. */
 	function bufferedAt(v: HTMLVideoElement, t: number) {
@@ -233,62 +219,59 @@
 			if (el.readyState < 3 && !stalled) return;
 			// In band, or out of attempts. A stall is neither, so it falls through to another seek
 			// rather than resuming a picture that is nowhere near the music.
-			if (Math.abs(drift) <= TRIM_TO || syncSeeks >= SYNC_SEEKS) {
+			if (Math.abs(drift) <= TUNE.trimTo || syncSeeks >= SYNC_SEEKS) {
 				synced = true;
 				// Hold the steady-state cooldown only if the picture is somewhere the trim can
 				// actually work from. Giving up still seconds out has to be allowed to seek at
 				// once, not sit out six more.
-				lastSeek = Math.abs(drift) <= SEEK_FROM ? performance.now() : 0;
+				lastSeek = Math.abs(drift) <= TUNE.seekFrom ? performance.now() : 0;
 				resumeVideo();
 				return;
 			}
 			syncSeeks++;
 			syncStart = performance.now(); // each attempt gets its own wait
-			trimming = false;
-			outOfBand = 0;
+			trim = { trimming: false, trimSpeed: playback.speed, outOfBand: 0 };
 			el.playbackRate = playback.speed;
 			// Lead a seek that has to fetch bytes, not one landing in data we already hold: the
 			// first costs about a second of motion, the second lands within a frame. Never while
 			// paused, since mpv is not moving and there is nothing to lead.
 			const target = mpvNow();
-			el.currentTime = target + (playback.paused || bufferedAt(el, target) ? 0 : SEEK_COST);
+			el.currentTime = seekTarget(target, playback.speed, playback.paused, bufferedAt(el, target), TUNE);
 			return;
 		}
-		if (Math.abs(drift) > SEEK_FROM) {
-			const now = performance.now();
-			if (now - lastSeek < SEEK_COOLDOWN) return; // let the last one finish re-buffering
-			lastSeek = now;
-			trimming = false;
-			outOfBand = 0;
-			el.playbackRate = playback.speed;
-			// Aim past the re-buffer this is about to cost, or it lands behind by exactly that.
-			// Not while paused: mpv is not moving, so the lead would only overshoot.
-			el.currentTime = mpvNow() + (playback.paused ? 0 : SEEK_COST);
-			return;
+		const { step, st } = steadyStep(drift, playback.speed, playback.paused, el.playbackRate, trim, TUNE);
+		trim = st;
+		if (step.kind === 'rate') el.playbackRate = step.rate;
+		if (step.kind !== 'seek') return;
+		const now = performance.now();
+		if (now - lastSeek < SEEK_COOLDOWN) return; // let the last one finish re-buffering
+		lastSeek = now;
+		el.playbackRate = playback.speed;
+		// Aim past the re-buffer this is about to cost, or it lands behind by exactly that.
+		const target = mpvNow();
+		el.currentTime = seekTarget(target, playback.speed, playback.paused, bufferedAt(el, target), TUNE);
+	}
+
+	/** A seek, a chapter jump or a skip on mpv's side: the picture is seconds away by definition,
+	 *  so run the converge phase again now (picture held still until it lands) instead of sitting
+	 *  out the seek cooldown and then trimming. */
+	function onTick() {
+		const tick = { pos: playback.position, at: playback.positionAt };
+		if (synced && jumped(lastTick, tick.pos, tick.at, playback.speed, playback.paused)) {
+			synced = false;
+			syncSeeks = 0;
+			syncStart = 0;
+			lastSeek = 0;
+			el?.pause();
 		}
-		if (playback.paused) return; // nothing is moving, so there is nothing to trim
-		// A tempo change makes the held rate meaningless: it was picked against the old speed.
-		if (trimming && trimSpeed !== playback.speed) trimming = false;
-		if (trimming) {
-			if (Math.abs(drift) > TRIM_TO) return; // still closing: hold the rate, write nothing
-			trimming = false;
-		}
-		if (el.playbackRate !== playback.speed) {
-			el.playbackRate = playback.speed; // ends a correction, or follows a tempo change
-			return;
-		}
-		outOfBand = Math.abs(drift) > TRIM_FROM ? outOfBand + 1 : 0;
-		if (outOfBand < TRIM_TICKS) return;
-		outOfBand = 0;
-		trimming = true;
-		trimSpeed = playback.speed;
-		el.playbackRate = trimFor(drift);
+		lastTick = tick;
 	}
 
 	$effect(() => {
 		playback.position; // the tick this runs on
 		playback.paused; // and a pause/resume, which position ticks do not cover
 		playback.speed; // and a tempo change, which must reach the picture without waiting for drift
+		onTick();
 		syncVideo();
 	});
 

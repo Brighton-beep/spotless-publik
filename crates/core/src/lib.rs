@@ -49,6 +49,7 @@ mod search2_bench; // stream: search2
 pub mod secrets;
 pub mod smart;
 pub mod spotify;
+pub mod speeds;
 pub mod state;
 #[cfg(test)]
 mod instant_tests; // stream: instant

@@ -209,3 +209,67 @@ async fn live_bad_visitor_data_heals() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Which picture a podcast episode resolves to (the Mac `<video>` path), and whether a byte range
+/// deep in it is served at full speed in bounded chunks.
+///
+/// cargo test -p encore-core --lib firstaudio_bench::live_podcast_video -- --ignored --nocapture
+/// `FA_VIDEO_IDS=a,b` overrides the episodes.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn live_podcast_video() {
+    let dir = std::env::temp_dir().join(format!("fa-video-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let vd = InnerTube::new(Session::default(), None).unwrap().fetch_visitor_data().await.ok();
+    let it = InnerTube::new(Session { visitor_data: vd.clone(), ..Session::default() }, None).unwrap();
+    let clients = Clients::bundled();
+    #[cfg(target_vendor = "apple")]
+    let js: Option<Arc<dyn crate::js::JsEngine>> = Some(Arc::new(crate::js::InProcEngine::jsc()));
+    #[cfg(not(target_vendor = "apple"))]
+    let js: Option<Arc<dyn crate::js::JsEngine>> = None;
+    let cipher = Arc::new(CipherDeobfuscator::new(js, &dir, Arc::new(PlayerConfigStore::new(&dir))));
+    let db = Arc::new(crate::db::Db::open(&dir.join("bench.sqlite")).unwrap());
+    let potoken = Arc::new(PoTokenGenerator::new(db));
+    let orch = Orchestrator::new(it.clone(), clients.clone(), cipher.clone(), potoken.clone());
+    cipher.prewarm().await;
+    let sts = cipher.signature_timestamp().await;
+    let main = clients.get(MAIN_CLIENT).unwrap();
+    for id in list("FA_VIDEO_IDS", &["S7CrlFLAmEA", "Uv2w4VTU-iQ"]) {
+        if let Some(sd) = it.player(main, &id, None, sts, None).await.ok().and_then(|r| r.streaming_data) {
+            let mut v: Vec<String> = sd
+                .adaptive_formats
+                .iter()
+                .filter(|f| !f.is_audio())
+                .map(|f| format!("{}:{}p{}", f.itag, f.height.unwrap_or(0), f.mime_type.split(';').next().unwrap_or("")))
+                .collect();
+            v.sort();
+            println!("{id}: WEB_REMIX video formats {v:?}");
+            for h in [720, 1080] {
+                println!("{id}: pick at {h}: {:?}", innertube::find_video_format(&sd, h).map(|f| f.itag));
+            }
+        }
+        for h in [720, 1080] {
+            let Some(url) = orch.resolve_video(&id, h, &Default::default()).await else {
+                println!("{id}: resolve_video({h}) -> None");
+                continue;
+            };
+            let itag = url.split("itag=").nth(1).and_then(|s| s.split('&').next()).unwrap_or("?");
+            // A bounded 4 MiB range 20 MiB in, the shape the proxy now sends upstream.
+            let t = Instant::now();
+            let r = crate::http::client()
+                .get(&url)
+                .header("Range", "bytes=20971520-25165823")
+                .send()
+                .await;
+            let (status, bytes) = match r {
+                Ok(r) => (r.status().as_u16(), r.bytes().await.map(|b| b.len()).unwrap_or(0)),
+                Err(_) => (0, 0),
+            };
+            let secs = t.elapsed().as_secs_f64();
+            println!(
+                "{id}: resolve_video({h}) itag={itag}; 4 MiB range: {status} {bytes} B in {secs:.2}s ({:.1} MB/s)",
+                bytes as f64 / secs / 1e6
+            );
+        }
+    }
+}

@@ -292,6 +292,41 @@ pub fn save_diagnostics(app: tauri::AppHandle, state: St<'_>, path: String) -> R
     std::fs::write(&path, crate::diagnostics::report(&app, &state.db)).map_err(|e| e.to_string())
 }
 
+/// What double-clicking a title bar does (System Settings > Desktop & Dock): the raw
+/// `AppleActionOnDoubleClick` value ("Maximize"/"Fill" zoom, "Minimize", "None"), or "Maximize"
+/// when unset or off macOS. Read per double-click, so a change in Settings applies at once.
+#[tauri::command]
+pub fn title_bar_double_click() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::rc::Retained;
+        use objc2::runtime::{AnyObject, Bool};
+        use objc2::{class, msg_send};
+        // SAFETY: standard NSUserDefaults/NSString API; standardUserDefaults falls back to the
+        // global domain, where this key lives.
+        unsafe {
+            let d: Retained<AnyObject> = msg_send![class!(NSUserDefaults), standardUserDefaults];
+            let key: Retained<AnyObject> =
+                msg_send![class!(NSString), stringWithUTF8String: c"AppleActionOnDoubleClick".as_ptr()];
+            let v: Option<Retained<AnyObject>> = msg_send![&*d, stringForKey: &*key];
+            if let Some(v) = v {
+                let p: *const std::ffi::c_char = msg_send![&*v, UTF8String];
+                if !p.is_null() {
+                    return std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned();
+                }
+            }
+            // Older macOS: a separate "minimise on double-click" switch.
+            let key: Retained<AnyObject> =
+                msg_send![class!(NSString), stringWithUTF8String: c"AppleMiniaturizeOnDoubleClick".as_ptr()];
+            let min: Bool = msg_send![&*d, boolForKey: &*key];
+            if min.as_bool() {
+                return "Minimize".into();
+            }
+        }
+    }
+    "Maximize".into()
+}
+
 /// Theater mode's fullscreen toggle (#139).
 ///
 /// `setFullscreen` on its own is not enough on Windows. tao decides the client area in
@@ -535,8 +570,14 @@ pub async fn playback_clock(state: St<'_>) -> Result<Option<serde_json::Value>, 
 }
 
 #[tauri::command]
-pub async fn set_playback_params(state: St<'_>, speed: f64, semitones: i32, reverb: player::Reverb) -> Result<(), String> {
-    api::set_playback_params(&state, speed, semitones, reverb).await
+pub async fn set_playback_params(
+    state: St<'_>,
+    speed: f64,
+    semitones: i32,
+    reverb: player::Reverb,
+    target: Option<String>,
+) -> Result<(), String> {
+    api::set_playback_params(&state, speed, semitones, reverb, target).await
 }
 
 #[tauri::command]

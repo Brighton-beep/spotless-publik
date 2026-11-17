@@ -354,7 +354,50 @@ async fn handle(req: Request<Incoming>) -> Result<Response<ProxyBody>, StatusCod
     }
     .ok_or(StatusCode::NOT_FOUND)?;
     crate::firstaudio::mark("proxy:request"); // stream: firstaudio
+    serve_registration(reg, &req).await
+}
 
+/// Registrations the video proxy made, newest last. The `<video>` element opens a stream with
+/// several range requests and reopens it on every seek, so one registration per URL learns the
+/// length once for all of them.
+static BY_URL: Mutex<VecDeque<Arc<Registration>>> = Mutex::new(VecDeque::new());
+
+/// The video proxy's way in (videoproxy.rs): serve `url` to a `<video>` element exactly as mpv's
+/// audio is served, in bounded upstream chunks. Forwarding the element's open-ended
+/// `Range: bytes=X-` untouched, as that proxy used to, is the request shape googlevideo throttles
+/// to about realtime (see the top of this file), which is what left podcast video stuck buffering
+/// on the Mac while its audio, through here, played on.
+pub(crate) async fn serve_url(
+    url: &str,
+    req: &Request<Incoming>,
+) -> Result<Response<ProxyBody>, StatusCode> {
+    let reg = {
+        let mut regs = BY_URL.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        match regs.iter().find(|r| r.url == url) {
+            Some(r) => r.clone(),
+            None => {
+                let r = Arc::new(Registration {
+                    url: url.to_owned(),
+                    headers: HashMap::new(),
+                    meta: Mutex::new(None),
+                    head: None,
+                });
+                if regs.len() >= 4 {
+                    regs.pop_front();
+                }
+                regs.push_back(r.clone());
+                r
+            }
+        }
+    };
+    serve_registration(reg, req).await
+}
+
+/// Serve one request for `reg`: the client's range, fetched upstream in bounded chunks.
+async fn serve_registration(
+    reg: Arc<Registration>,
+    req: &Request<Incoming>,
+) -> Result<Response<ProxyBody>, StatusCode> {
     let want = parse_range(req.headers().get(header::RANGE).and_then(|v| v.to_str().ok()));
     let is_head = req.method() == Method::HEAD;
 

@@ -72,6 +72,8 @@ pub struct AppState {
     pub orchestrator: Arc<Orchestrator>,
     // Serialize effect commands with the live-stream tempo reset, including requests pending.
     playback_effects: Mutex<()>,
+    /// Music's effects and the spoken-word speed, kept apart (speeds.rs).
+    speeds: std::sync::Mutex<crate::speeds::Speeds>,
     /// mpv's on-disk audio cache dir (context/14) — wiped by the settings "Clear caches" action.
     cache_dir: std::path::PathBuf,
     /// OS media integration (MPRIS/SMTC/NowPlaying). `None` if it failed to init. context/16.
@@ -557,6 +559,8 @@ impl AppState {
         cache_dir: std::path::PathBuf,
         media: Option<Box<dyn MediaControls>>,
     ) -> Self {
+        let speeds =
+            crate::speeds::Speeds::with_spoken(db.get_setting(crate::speeds::EPISODE_SPEED_KEY).as_deref());
         AppState {
             it,
             clients,
@@ -568,6 +572,7 @@ impl AppState {
             media,
             queue: Mutex::new(QueueState::default()),
             playback_effects: Mutex::new(()),
+            speeds: std::sync::Mutex::new(speeds),
             auth: tokio::sync::Mutex::default(),
             reload_mutex: tokio::sync::Mutex::default(),
             loading_gen: AtomicU64::new(0),
@@ -2170,6 +2175,7 @@ impl AppState {
             q.live = false;
         }
         if let Some(item) = self.current_item().await {
+            self.apply_item_effects(&item).await; // speeds.rs: an episode into a song, or back
             self.emit_now_playing(&item, "gapless", false);
             if hold {
                 // The sleep timer stopped at the boundary: mpv sits paused at the next track's
@@ -2573,6 +2579,7 @@ impl AppState {
         };
         // ── stream: instant ── Held through `load` + `play`, so a newer tap's `show_loading` either
         // lands first (and this load sees the new generation) or pauses what this one started.
+        self.apply_item_effects(&item).await; // speeds.rs: before a byte plays
         let reload = self.reload_mutex.lock().await;
         if self.generation.load(Ordering::SeqCst) != gen {
             return false; // user moved on
@@ -3160,14 +3167,47 @@ impl AppState {
         }
     }
 
+    /// A Speed & pitch change, for music or spoken word (`target`; `None` is whatever is playing).
+    /// It is kept in its own bucket (speeds.rs) and applied only if that is what is playing now:
+    /// the music sheet used while an episode plays changes the next song, not the episode.
     pub async fn set_playback_params(
         &self,
         speed: f64,
         semitones: i32,
         reverb: player::Reverb,
+        target: Option<crate::speeds::Target>,
     ) -> Result<(), String> {
+        use crate::speeds::Target;
+        if !speed.is_finite() || !player::SPEED_RANGE.contains(&speed) {
+            return Err("Invalid playback effect values".into());
+        }
         let _effects = self.playback_effects.lock().await;
-        self.apply_playback_params(speed, semitones, reverb).await
+        let spoken_now = self.current_item().await.is_some_and(|i| crate::podcasts::is_episode_item(&i));
+        let target = target.unwrap_or(if spoken_now { Target::Spoken } else { Target::Music });
+        let mut next = *self.speeds.lock().unwrap();
+        next.set(target, (speed, semitones, reverb));
+        if (target == Target::Spoken) == spoken_now {
+            let (speed, semitones, reverb) = next.for_item(spoken_now);
+            self.apply_playback_params(speed, semitones, reverb).await?;
+        }
+        *self.speeds.lock().unwrap() = next;
+        if target == Target::Spoken {
+            self.db.set_setting(crate::speeds::EPISODE_SPEED_KEY, &speed.to_string());
+        }
+        Ok(())
+    }
+
+    /// Put the playing item's own speed on mpv (speeds.rs): called on every track start, so an
+    /// episode never hands its 2x to the song after it, nor a song its pitch to an episode.
+    async fn apply_item_effects(&self, item: &SongItem) {
+        let _effects = self.playback_effects.lock().await;
+        let want = self.speeds.lock().unwrap().for_item(crate::podcasts::is_episode_item(item));
+        if want == self.player.playback_params() {
+            return;
+        }
+        if let Err(error) = self.apply_playback_params(want.0, want.1, want.2).await {
+            tracing::warn!(%error, "speeds: the item's own speed did not apply");
+        }
     }
 
     // Caller holds playback_effects through the update and notification so two windows cannot

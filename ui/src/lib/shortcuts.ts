@@ -59,7 +59,8 @@ export type ShellKeys = {
 	find?(): void;
 };
 
-const SPEEDS = [0.5, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+// Up to the core's 3x (player::SPEED_RANGE), the podcast menu's top speed.
+const SPEEDS = [0.5, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 function stepSpeed(dir: number) {
 	const i = SPEEDS.findIndex((s) => s >= playback.speed - 1e-6);
 	const next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, (i < 0 ? 4 : i) + dir))];
