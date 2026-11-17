@@ -97,14 +97,35 @@ pub enum ResolveError {
     /// about this particular track, so the queue must not skip past it or drop it.
     #[error("could not reach YouTube. Check your connection and try again ({0})")]
     Unreachable(String),
+    /// YouTube answered, but refused *us* rather than this video: a bot check, a 403/429, a
+    /// consent or "Sorry" page, stream URLs that would not serve. Nothing in it says the track is
+    /// gone, so it must not be marked unavailable or skipped: on the owner's iPhone (TestFlight
+    /// 1.0.1 build 13) treating this as "unavailable" walked ~70 tracks in two minutes. Only a
+    /// per-video playability answer (removed, private, region-locked, age-gated) is a verdict on
+    /// the track, and that stays `AllClientsFailed`.
+    #[error("{REFUSED_MESSAGE}")]
+    Refused(String),
 }
+
+/// What the user is told when YouTube is refusing requests, and when playback stops after
+/// [`crate::state::MAX_FAILURE_STREAK`] tracks in a row would not resolve.
+pub const REFUSED_MESSAGE: &str = "Can't reach YouTube right now. Try again in a moment.";
 
 impl ResolveError {
     /// Would every other track in the queue fail this way too? A caller deciding whether to skip
     /// forward, or to delete a row, has to know: skipping is right for a track YouTube refused and
     /// wrong for an outage, where it walks the whole queue and deletes what it passes.
     pub fn affects_every_track(&self) -> bool {
-        matches!(self, ResolveError::Unreachable(_) | ResolveError::SignInRequired(_))
+        matches!(
+            self,
+            ResolveError::Unreachable(_) | ResolveError::SignInRequired(_) | ResolveError::Refused(_)
+        )
+    }
+
+    /// The source is refusing or unreachable right now, which is what the resolve backoff
+    /// (`firstaudio::Backoff`) holds speculative and lookahead resolves back for.
+    pub fn is_transient(&self) -> bool {
+        matches!(self, ResolveError::Unreachable(_) | ResolveError::Refused(_))
     }
 }
 
@@ -160,12 +181,38 @@ const HEAL_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 /// second one is ever built.
 fn claim_heal() -> bool {
     static LAST: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
-    let Ok(mut last) = LAST.lock() else { return false };
-    if last.is_some_and(|t| t.elapsed() < HEAL_COOLDOWN) {
+    claim_every(&LAST, HEAL_COOLDOWN)
+}
+
+/// How often the anonymous clients may be handed a fresh visitorData after a bot check
+/// ([`Orchestrator::refresh_anon_visitor`]): one `sw.js_data` GET, never a burst of them.
+const VISITOR_REFRESH_EVERY: Duration = Duration::from_secs(10 * 60);
+
+fn claim_visitor_refresh() -> bool {
+    static LAST: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+    claim_every(&LAST, VISITOR_REFRESH_EVERY)
+}
+
+/// `true` at most once per `every`, process-wide.
+fn claim_every(last: &std::sync::Mutex<Option<Instant>>, every: Duration) -> bool {
+    let Ok(mut last) = last.lock() else { return false };
+    if last.is_some_and(|t| t.elapsed() < every) {
         return false;
     }
     *last = Some(Instant::now());
     true
+}
+
+/// A not-OK playability answer that is about this video (removed, private, region-locked,
+/// age-gated), as opposed to a bot check, which is about us. The reason is matched on words
+/// because a bot check arrives as a plain `UNPLAYABLE` or `LOGIN_REQUIRED` in the app's language.
+fn is_verdict(p: &innertube::models::player::PlayabilityStatus) -> bool {
+    !p.is_ok() && !p.reason.as_deref().is_some_and(crate::import::is_bot_check)
+}
+
+/// One attempt's outcome for the failure log: `CLIENT: STATUS (reason)`.
+fn playability_note(client: &str, p: &innertube::models::player::PlayabilityStatus) -> String {
+    format!("{client}: {} ({})", p.status, p.reason.as_deref().unwrap_or(""))
 }
 
 /// Record a failure, dropping expired entries on the way so the map cannot grow.
@@ -281,7 +328,7 @@ impl Orchestrator {
         let main_call = async {
             match main_client {
                 Some(c) if !disabled.contains(MAIN_CLIENT) => {
-                    self.it.player(c, video_id, playlist_id, sts, session_pot).await.ok()
+                    Some(self.it.player(c, video_id, playlist_id, sts, session_pot).await)
                 }
                 _ => None,
             }
@@ -316,10 +363,25 @@ impl Orchestrator {
             };
             Some((answered, probed))
         };
-        let (mut main_resp, early) = tokio::join!(main_call, early_call);
+        let (main_res, early) = tokio::join!(main_call, early_call);
         let (mut early, mut probed) = match early {
             Some((a, p)) => (Some(a), p),
             None => (None, None),
+        };
+        // What each client said, for the one WARN a failed resolve logs (the next phone log has to
+        // say whether VISIONOS got a 403, a bot check or something else). Kept short and only
+        // logged on failure, so a working session logs nothing new.
+        let mut notes: Vec<String> = Vec::new();
+        // Did any client say something about *this video* (removed, region-locked, age-gated)?
+        // Only that makes the failure a verdict on the track; everything else is a refusal.
+        let mut verdict = false;
+        let mut main_resp = match main_res {
+            Some(Ok(r)) => Some(r),
+            Some(Err(e)) => {
+                notes.push(format!("{MAIN_CLIENT}: {e}"));
+                None
+            }
+            None => None,
         };
 
         crate::firstaudio::mark("resolve:player"); // stream: firstaudio
@@ -356,12 +418,11 @@ impl Orchestrator {
         if let Some(r) = main_resp.as_ref().filter(|_| !main_ok) {
             login_wanted = r.playability_status.status == "LOGIN_REQUIRED";
             crate::import::note_playability(r.playability_status.reason.as_deref());
-            tracing::debug!(
-                client = main_key,
-                status = %r.playability_status.status,
-                reason = r.playability_status.reason.as_deref().unwrap_or(""),
-                "not OK"
-            );
+            // Without a PoToken WEB_REMIX answers UNPLAYABLE ("The page needs to be reloaded")
+            // for every video (the iPhone, always): that says nothing about this one.
+            verdict |= session_pot.is_some() && is_verdict(&r.playability_status);
+            let pot = if session_pot.is_some() { "" } else { " [no PoToken]" };
+            notes.push(format!("{}{pot}", playability_note(main_key, &r.playability_status)));
         }
         let has_high = main_resp
             .as_ref()
@@ -429,31 +490,46 @@ impl Orchestrator {
                 // (context/06 §graceful PoToken degradation).
                 if client.use_web_po_tokens && client_pot.is_none() {
                     tracing::debug!(client = key, "no PoToken, skipping");
+                    notes.push(format!("{key}: skipped, no PoToken"));
                     continue;
                 }
                 let client_sts = if client.use_signature_timestamp { sts } else { None };
-                let answered = match early.take().filter(|_| idx == 0) {
+                let mut answered = match early.take().filter(|_| idx == 0) {
                     Some(a) => a,
                     None => {
                         self.it.player(client, video_id, playlist_id, client_sts, client_pot).await
                     }
                 };
+                // A client that never logs in, bot-checked: its visitorData is the likely cause
+                // (see `InnerTube::set_anon_visitor_data`), so give it a fresh anonymous one and
+                // ask once more. Rationed process-wide, so a flagged IP costs one extra request
+                // per ten minutes, not one per track.
+                let bot_checked = |a: &Result<PlayerResponse, innertube::Error>| {
+                    matches!(a, Ok(r) if !r.playability_status.is_ok()
+                        && r.playability_status.reason.as_deref().is_some_and(crate::import::is_bot_check))
+                };
+                if !client.login_supported
+                    && bot_checked(&answered)
+                    && self.refresh_anon_visitor().await
+                {
+                    if let Ok(r) = &answered {
+                        notes.push(playability_note(key, &r.playability_status));
+                    }
+                    answered =
+                        self.it.player(client, video_id, playlist_id, client_sts, client_pot).await;
+                }
                 reached |= answered.is_ok();
                 match answered {
                     Ok(r) if r.playability_status.is_ok() => (key.to_owned(), r),
                     Ok(r) => {
                         login_wanted |= r.playability_status.status == "LOGIN_REQUIRED";
                         crate::import::note_playability(r.playability_status.reason.as_deref());
-                        tracing::debug!(
-                            client = key,
-                            status = %r.playability_status.status,
-                            reason = r.playability_status.reason.as_deref().unwrap_or(""),
-                            "not OK"
-                        );
+                        verdict |= is_verdict(&r.playability_status);
+                        notes.push(playability_note(key, &r.playability_status));
                         continue;
                     }
                     Err(e) => {
-                        tracing::warn!(client = key, error = %e, "player call failed");
+                        notes.push(format!("{key}: {e}"));
                         continue;
                     }
                 }
@@ -497,7 +573,7 @@ impl Orchestrator {
                         is_upload,
                     );
                     let Some(master) = self.fetch_manifest(&url, &headers).await else {
-                        tracing::warn!(video_id, client = %key, "HLS playlist refused");
+                        notes.push(format!("{key}: HLS playlist refused"));
                         continue;
                     };
                     if let Some(variant) = pick_hls_variant(&master, quality) {
@@ -517,7 +593,10 @@ impl Orchestrator {
                     ));
                 }
             }
-            let Some(format) = find_format(streaming, quality) else { continue };
+            let Some(format) = find_format(streaming, quality) else {
+                notes.push(format!("{key}: no audio format"));
+                continue;
+            };
             crate::firstaudio::mark("resolve:format"); // stream: firstaudio
             if audio_config_loudness.is_none() {
                 audio_config_loudness = main_loudness(&resp);
@@ -528,7 +607,7 @@ impl Orchestrator {
             // its chain is a web client, so the whole chain produces nothing and the user sees
             // "sign-in needed" for what is really a broken extraction runtime. Issues #71/#128.
             let Some(mut url) = self.find_url(format, video_id).await else {
-                tracing::warn!(video_id, client = %key, itag = format.itag, "no stream URL (deciphering unavailable?)");
+                notes.push(format!("{key}: no stream URL (deciphering unavailable?)"));
                 continue;
             };
 
@@ -589,7 +668,10 @@ impl Orchestrator {
                     self.validate_stream(&url, &headers, content_length(format)).await
                 }
             };
-            if valid {
+            if let Err(why) = &valid {
+                notes.push(format!("{key}: stream probe {why}"));
+            }
+            if valid.is_ok() {
                 crate::firstaudio::mark("resolve:validated"); // stream: firstaudio
                 let ping = main_ping.clone().or_else(|| playback_ping(&resp, &key));
                 return Ok(self.build(
@@ -678,11 +760,23 @@ impl Orchestrator {
             return Err(ResolveError::UploadUnavailable(video_id.to_owned()));
         }
         tracing::info!(video_id, "all InnerTube clients exhausted → rustypipe fallback");
+        // The one WARN a failed resolve logs, with every attempt's answer in it.
+        let fail = |notes: &[String], e: ResolveError| {
+            tracing::warn!(
+                video_id,
+                error = ?e,
+                logged_in,
+                visitor = visitor.is_some(),
+                attempts = %notes.join("; "),
+                "no playable stream"
+            );
+            e
+        };
         match rustypipe_fallback::resolve(video_id, prefer_high).await {
-            Ok(c) if !self.validate_stream(&c.url, &HashMap::new(), Some(c.size)).await => {
-                tracing::warn!(video_id, "rustypipe URL serves only its first MiB, not playable");
+            Ok(c) if self.validate_stream(&c.url, &HashMap::new(), Some(c.size)).await.is_err() => {
+                notes.push("rustypipe: URL serves only its first MiB".to_owned());
                 // rustypipe answered, so the network is up and this failure is about the URL.
-                Err(nothing_played(video_id, logged_in, login_wanted, true))
+                Err(fail(&notes, nothing_played(video_id, logged_in, login_wanted, true, verdict)))
             }
             Ok(c) => Ok(PlaybackData {
                 video_id: video_id.to_owned(),
@@ -703,13 +797,36 @@ impl Orchestrator {
                 stream_client: "rustypipe".to_owned(),
             }),
             Err(e) => {
-                tracing::error!(video_id, error = %e, "rustypipe fallback failed");
+                notes.push(format!("rustypipe: {e}"));
                 // rustypipe is the last thing that spoke to YouTube, so its verdict counts as an
                 // answer even when every InnerTube client was skipped or errored (a disabled
                 // MAIN/VISIONOS pair, or TVHTML5_SIMPLY passed over for want of a PoToken). Without
                 // this, a genuinely dead video reads as an outage and the queue sits on it.
+                // Its panic on a page with no visitor data (#564) is `RustyPipe`, not an answer:
+                // that page is a consent or bot interstitial, never a verdict on the video.
                 let reached = reached || e.answered();
-                Err(nothing_played(video_id, logged_in, login_wanted, reached))
+                let verdict = verdict || rustypipe_verdict(&e);
+                Err(fail(&notes, nothing_played(video_id, logged_in, login_wanted, reached, verdict)))
+            }
+        }
+    }
+
+    /// The anonymous clients were bot-checked: fetch them a fresh anonymous visitorData (one
+    /// `sw.js_data` GET, at most once per [`VISITOR_REFRESH_EVERY`]). `true` when the caller
+    /// should ask again with it.
+    async fn refresh_anon_visitor(&self) -> bool {
+        if !claim_visitor_refresh() {
+            return false;
+        }
+        match self.it.fetch_visitor_data().await {
+            Ok(vd) => {
+                tracing::warn!("anonymous client bot-checked: retrying with a fresh visitorData");
+                self.it.set_anon_visitor_data(Some(vd));
+                true
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "anonymous client bot-checked; no fresh visitorData");
+                false
             }
         }
     }
@@ -799,7 +916,7 @@ impl Orchestrator {
         let format = find_video_format(&sd, max_height)?;
         let url = self.find_url(format, video_id).await?;
         let url = self.sign(url, Some(client), video_id, visitor.as_deref()).await;
-        if !self.validate_stream(&url, &HashMap::new(), content_length(format)).await {
+        if self.validate_stream(&url, &HashMap::new(), content_length(format)).await.is_err() {
             tracing::debug!(video_id, itag = format.itag, "video: WEB_REMIX URL refused");
             return None;
         }
@@ -880,13 +997,14 @@ impl Orchestrator {
     /// `headers` is what `build` will hand mpv, so the probe carries exactly what the real fetch
     /// will (issue #71). Falls back to a HEAD when there is no length to aim at: an RSS-feed
     /// podcast's enclosure is not on googlevideo, reports `contentLength: "0"`, and may not honour
-    /// ranges at all (#294). Success = 2xx, false on any error.
+    /// ranges at all (#294). Success = 2xx; the error is the status (or the transport error) for
+    /// the failure log.
     async fn validate_stream(
         &self,
         url: &str,
         headers: &HashMap<String, String>,
         content_length: Option<u64>,
-    ) -> bool {
+    ) -> Result<(), String> {
         let req = match content_length.filter(|n| *n > 0).filter(|_| is_youtube_stream(url)) {
             Some(len) => crate::http::client()
                 .get(url)
@@ -899,7 +1017,12 @@ impl Orchestrator {
         for (k, v) in headers {
             req = req.header(k, v);
         }
-        matches!(req.send().await, Ok(r) if r.status().is_success())
+        match req.send().await {
+            Ok(r) if r.status().is_success() => Ok(()),
+            Ok(r) => Err(format!("HTTP {}", r.status().as_u16())),
+            Err(e) if e.is_timeout() => Err("timed out".to_owned()),
+            Err(e) => Err(format!("failed: {e}")),
+        }
     }
 
     /// A live playlist is text with no length, so the ranged probe above has nothing to ask for:
@@ -1051,19 +1174,34 @@ fn stream_headers(
 /// The error for a track nothing could stream. Signing in is a real fix when YouTube asked for an
 /// account and there is no session, and useless noise otherwise (issue #292).
 /// When no response came back at all (`reached` false), we never learned anything about this video.
+/// `verdict`: some client said something about this video itself (see [`is_verdict`]); without
+/// one, YouTube refused us, not the track, and the answer is [`ResolveError::Refused`].
 fn nothing_played(
     video_id: &str,
     logged_in: bool,
     login_wanted: bool,
     reached: bool,
+    verdict: bool,
 ) -> ResolveError {
     if !reached {
         return ResolveError::Unreachable(video_id.to_owned());
     }
     if login_wanted && !logged_in {
         ResolveError::SignInRequired(video_id.to_owned())
-    } else {
+    } else if verdict {
         ResolveError::AllClientsFailed(video_id.to_owned())
+    } else {
+        ResolveError::Refused(video_id.to_owned())
+    }
+}
+
+/// rustypipe's own playability answer about the video, bot checks excepted.
+fn rustypipe_verdict(e: &rustypipe_fallback::FallbackError) -> bool {
+    use rustypipe_fallback::FallbackError as F;
+    match e {
+        F::AgeRestricted => true,
+        F::Unavailable(msg) => !crate::import::is_bot_check(msg),
+        F::NoAudio | F::RustyPipe(_) => false,
     }
 }
 
@@ -1202,7 +1340,7 @@ mod tests {
         {
             assert!(
                 matches!(
-                    nothing_played("v", logged_in, login_wanted, false),
+                    nothing_played("v", logged_in, login_wanted, false, true),
                     ResolveError::Unreachable(_)
                 ),
                 "an outage must never read as a verdict on the track"
@@ -1210,16 +1348,53 @@ mod tests {
         }
     }
 
-    /// The regression guard for issue #292's fix, once YouTube did answer.
+    /// The regression guard for issue #292's fix, once YouTube did answer about the video.
     #[test]
     fn nothing_played_keeps_its_old_answers_when_youtube_answered() {
-        assert!(matches!(nothing_played("v", false, true, true), ResolveError::SignInRequired(_)));
+        assert!(matches!(
+            nothing_played("v", false, true, true, true),
+            ResolveError::SignInRequired(_)
+        ));
         for (logged_in, login_wanted) in [(false, false), (true, true), (true, false)] {
             assert!(matches!(
-                nothing_played("v", logged_in, login_wanted, true),
+                nothing_played("v", logged_in, login_wanted, true, true),
                 ResolveError::AllClientsFailed(_)
             ));
         }
+    }
+
+    /// The iPhone's skip storm: every client answered, none about the video (VISIONOS bot-checked,
+    /// WEB_REMIX tokenless, rustypipe's visitor-data panic). That is a refusal, not "unavailable".
+    #[test]
+    fn an_answer_with_no_verdict_on_the_video_is_a_refusal() {
+        for logged_in in [true, false] {
+            let e = nothing_played("v", logged_in, false, true, false);
+            assert!(matches!(e, ResolveError::Refused(_)), "{e:?}");
+            assert!(e.affects_every_track() && e.is_transient());
+            assert_eq!(e.to_string(), super::REFUSED_MESSAGE);
+        }
+    }
+
+    #[test]
+    fn only_a_per_video_answer_is_a_verdict() {
+        let p = |status: &str, reason: &str| innertube::models::player::PlayabilityStatus {
+            status: status.into(),
+            reason: Some(reason.into()),
+        };
+        assert!(super::is_verdict(&p("ERROR", "Video unavailable")));
+        assert!(super::is_verdict(&p("UNPLAYABLE", "This video is not available in your country")));
+        assert!(super::is_verdict(&p("LOGIN_REQUIRED", "Sign in to confirm your age")));
+        assert!(!super::is_verdict(&p("UNPLAYABLE", "Sign in to confirm you\u{2019}re not a bot")));
+        assert!(!super::is_verdict(&p("UNPLAYABLE", "Log in om te bevestigen dat je geen bot bent")));
+        assert!(!super::is_verdict(&p("OK", "")));
+
+        use super::rustypipe_fallback::FallbackError as F;
+        assert!(super::rustypipe_verdict(&F::Unavailable("Video unavailable".into())));
+        assert!(super::rustypipe_verdict(&F::AgeRestricted));
+        assert!(!super::rustypipe_verdict(&F::Unavailable("Sign in to confirm you're not a bot".into())));
+        assert!(!super::rustypipe_verdict(&F::RustyPipe(
+            "panicked: Could not find visitor data on html page".into()
+        )));
     }
 
     #[test]

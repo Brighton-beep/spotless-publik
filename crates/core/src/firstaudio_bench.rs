@@ -182,3 +182,30 @@ async fn live_tap_to_audio_and_search() {
     summary("playlist", &mut playlist);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// The iPhone's refusal (TestFlight 1.0.1 build 13), reproduced: a session whose visitorData
+/// YouTube does not accept gets "Sign in to confirm you're not a bot" from VISIONOS for every
+/// "- Topic" track. The resolve must fetch the anonymous clients a fresh visitorData and play.
+///
+/// ```sh
+/// ENCORE_IOS_CHAIN=1 cargo test -p encore-core --no-default-features --lib \
+///   live_bad_visitor_data_heals -- --ignored --nocapture
+/// ```
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn live_bad_visitor_data_heals() {
+    let dir = std::env::temp_dir().join(format!("fa-vd-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let bad = Some("CgtXXXXXXXXXXXXXXXX%3D%3D".to_owned());
+    let it = InnerTube::new(Session { visitor_data: bad, ..Session::default() }, None).unwrap();
+    let cipher = Arc::new(CipherDeobfuscator::new(None, &dir, Arc::new(PlayerConfigStore::new(&dir))));
+    let db = Arc::new(crate::db::Db::open(&dir.join("vd.sqlite")).unwrap());
+    let orch = Orchestrator::new(it, Clients::bundled(), cipher, Arc::new(PoTokenGenerator::new(db)));
+    // Starboy, Ride: generated audio tracks, the kind VISIONOS bot-checks.
+    for id in ["3_g2un5M350", "w1Smzzw_w7Q"] {
+        let d = orch.resolve(id, false, AudioQuality::High, &Default::default()).await;
+        println!("{id}: {:?}", d.as_ref().map(|d| &d.stream_client));
+        assert_eq!(d.unwrap().stream_client, "VISIONOS");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

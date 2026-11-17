@@ -228,6 +228,11 @@ pub struct InnerTube {
     /// [`InnerTube::set_client_version`].
     versions: Arc<RwLock<HashMap<String, String>>>,
     // ── end stream: reliability ──
+    /// A fresh anonymous visitorData for the clients that never carry the account (VISIONOS and
+    /// the other `loginSupported: false` identities). `None` until the orchestrator sees one of
+    /// them bot-checked; then it wins over the session's, for those clients only. See
+    /// [`InnerTube::set_anon_visitor_data`].
+    anon_visitor: Arc<RwLock<Option<String>>>,
 }
 
 impl InnerTube {
@@ -258,6 +263,7 @@ impl InnerTube {
             cache: Arc::new(ResponseCache::default()),
             stats: Arc::new(Stats::default()),
             versions: Arc::new(RwLock::new(HashMap::new())),
+            anon_visitor: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -313,6 +319,10 @@ impl InnerTube {
             .http
             .get(SW_JS_DATA_URL)
             .header("user-agent", WEB_UA)
+            // The EU consent choice ("reject all"), as yt-dlp sends it: without one an EU IP can
+            // be answered with the consent interstitial instead of the config. The app is in
+            // Belgium; this is the request that mints the anonymous clients' visitorData.
+            .header("cookie", "SOCS=CAI")
             .send()
             .await?
             .error_for_status()?
@@ -412,6 +422,29 @@ impl InnerTube {
         self.session.read().unwrap().visitor_data.clone()
     }
 
+    /// Give the anonymous clients (`loginSupported: false`) a visitorData of their own.
+    ///
+    /// Measured 2026-11-17: VISIONOS answers "Sign in to confirm you're not a bot" for generated
+    /// audio tracks (the "- Topic" uploads) when its visitorData is missing or one YouTube does
+    /// not accept, while music videos still play; with a fresh anonymous one the same ids play.
+    /// That is the iPhone's failure exactly (Topic tracks refused, the Rick Astley health probe
+    /// fine), and there the session's visitorData is the signed-in account's, sent by a client
+    /// that never carries the account. The session's stays as it is for every other client.
+    pub fn set_anon_visitor_data(&self, vd: Option<String>) {
+        *self.anon_visitor.write().unwrap() = vd;
+    }
+
+    /// The visitorData `client` sends: the anonymous one for a client that never logs in, when
+    /// there is one, else the session's.
+    fn visitor_for(&self, client: &YouTubeClient, session: &Session) -> Option<String> {
+        if !client.login_supported {
+            if let Some(vd) = self.anon_visitor.read().unwrap().clone() {
+                return Some(vd);
+            }
+        }
+        session.visitor_data.clone()
+    }
+
     /// The current cookie header, if logged in (for the stream-validation HEAD request).
     pub fn cookie(&self) -> Option<String> {
         self.session.read().unwrap().cookie.clone()
@@ -472,7 +505,8 @@ impl InnerTube {
         // `onBehalfOfUser` makes Google *require* a credential: with no cookie it turns a request
         // that would have worked anonymously into a hard 401. Only send it when we can authenticate.
         let dsid = s.cookie.as_ref().and(s.data_sync_id.as_deref());
-        let ctx = client.to_context(&s.locale, s.visitor_data.as_deref(), dsid);
+        let vd = self.visitor_for(client, &s);
+        let ctx = client.to_context(&s.locale, vd.as_deref(), dsid);
         drop(s);
         self.with_live_version(client, ctx)
     }
@@ -817,8 +851,8 @@ impl InnerTube {
 
         let s = self.session.read().unwrap();
         set(&mut h, "accept-language", &s.locale.accept_language());
-        if let Some(vd) = &s.visitor_data {
-            set(&mut h, "x-goog-visitor-id", vd);
+        if let Some(vd) = self.visitor_for(client, &s) {
+            set(&mut h, "x-goog-visitor-id", &vd);
         }
 
         // SAPISIDHASH cookie auth — only when logged in AND the client supports it (Phase 3).
@@ -1148,6 +1182,25 @@ mod tests {
 
         it.set_cookie(Some("SAPISID=secret".into()));
         assert_eq!(it.context_for(web).user.on_behalf_of_user.as_deref(), Some("abc123"));
+    }
+
+    /// The anonymous visitorData reaches the clients that never log in, body and header, and
+    /// nothing else: WEB_REMIX keeps the session's.
+    #[test]
+    fn the_anonymous_visitor_goes_only_to_clients_that_never_log_in() {
+        let clients = crate::clients::Clients::bundled();
+        let (web, vis) = (clients.get("WEB_REMIX").unwrap(), clients.get("VISIONOS").unwrap());
+        let session = Session { visitor_data: Some("signed-in".into()), ..Default::default() };
+        let it = InnerTube::new(session, None).unwrap();
+        let header = |c| it.headers(c, true).get("x-goog-visitor-id").cloned().unwrap();
+        assert_eq!(it.context_for(vis).client.visitor_data.as_deref(), Some("signed-in"));
+
+        it.set_anon_visitor_data(Some("anon".into()));
+        assert_eq!(it.context_for(vis).client.visitor_data.as_deref(), Some("anon"));
+        assert_eq!(header(vis), "anon");
+        assert_eq!(it.context_for(web).client.visitor_data.as_deref(), Some("signed-in"));
+        assert_eq!(header(web), "signed-in");
+        assert_eq!(it.visitor_data().as_deref(), Some("signed-in"), "the session is untouched");
     }
 
     #[test]

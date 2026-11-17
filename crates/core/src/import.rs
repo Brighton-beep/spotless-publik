@@ -263,7 +263,7 @@ pub fn note_playability(reason: Option<&str>) {
     }
 }
 
-fn is_bot_check(reason: &str) -> bool {
+pub(crate) fn is_bot_check(reason: &str) -> bool {
     reason
         .to_lowercase()
         .split(|c: char| !c.is_alphanumeric())

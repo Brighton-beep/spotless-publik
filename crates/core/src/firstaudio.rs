@@ -106,8 +106,11 @@ use std::time::Duration;
 
 /// A track hinted once is not hinted again for this long (its URL is cached for hours anyway).
 const HINT_AGAIN: Duration = Duration::from_secs(10 * 60);
-/// Network resolves hints may spend per rolling minute.
-const HINTS_PER_MINUTE: usize = 12;
+/// Network resolves hints may spend per rolling minute. Fewer on the iPhone: a hint there is a
+/// touch-down, which scrolling a list produces constantly, and each one costs two `/player` calls
+/// (WEB_REMIX + VISIONOS) and two stream ranges. YouTube Music itself asks for `/player` only on
+/// play, so a session that hints a dozen tracks a minute does not look like one person listening.
+const HINTS_PER_MINUTE: usize = if cfg!(target_os = "ios") { 4 } else { 12 };
 
 #[derive(Default)]
 pub struct Hints {
@@ -115,16 +118,78 @@ pub struct Hints {
     spent: VecDeque<Instant>,
     /// When the hint in flight started.
     busy: Option<Instant>,
+    /// YouTube refused a resolve: speculative work (hints, the gapless lookahead) holds off.
+    pub backoff: Backoff,
 }
 
 /// A hint still running after this is stuck behind the background limiter; the next one may start
 /// beside it rather than every later hover being dropped until it clears.
 const STUCK: Duration = Duration::from_secs(3);
 
+/// The first hold after a refused resolve; each refusal in a row doubles it, up to [`BACKOFF_MAX`].
+const BACKOFF_FIRST: Duration = Duration::from_secs(60);
+const BACKOFF_MAX: Duration = Duration::from_secs(10 * 60);
+
+/// After a resolve fails transiently (a bot check, a 403/429, no network: `ResolveError::
+/// is_transient`), nothing the user did not ask for resolves for a while: hints and the gapless
+/// lookahead wait, 60 s doubling to 10 min. Requests that keep coming while a source refuses us
+/// are what keeps it refusing. A tap still resolves (once, with no auto-advance after it), and the
+/// first resolve that works ends the hold.
+#[derive(Debug)]
+pub struct Backoff {
+    until: Option<Instant>,
+    next: Duration,
+}
+
+impl Default for Backoff {
+    fn default() -> Self {
+        Backoff { until: None, next: BACKOFF_FIRST }
+    }
+}
+
+impl Backoff {
+    /// Start (or lengthen) the hold; returns how long it is.
+    pub fn refused(&mut self, now: Instant) -> Duration {
+        let hold = self.next;
+        self.until = Some(now + hold);
+        self.next = (hold * 2).min(BACKOFF_MAX);
+        hold
+    }
+
+    pub fn succeeded(&mut self) {
+        *self = Backoff::default();
+    }
+
+    pub fn holds(&self, now: Instant) -> bool {
+        self.until.is_some_and(|u| now < u)
+    }
+}
+
+/// Record a network resolve's outcome in [`Hints::backoff`]. `transient`: `None` on success.
+pub fn note_resolve(transient: Option<bool>) {
+    let Ok(mut h) = HINTS.lock() else { return };
+    match transient {
+        None => h.backoff.succeeded(),
+        Some(true) => {
+            let hold = h.backoff.refused(Instant::now());
+            tracing::warn!(?hold, "resolve refused: holding hints and lookahead");
+        }
+        Some(false) => {}
+    }
+}
+
+/// Whether speculative resolves (the gapless lookahead) should wait. See [`Backoff`].
+pub fn backing_off() -> bool {
+    HINTS.lock().is_ok_and(|h| h.backoff.holds(Instant::now()))
+}
+
 impl Hints {
     /// Whether a hint for `id` may start now. Admitting it marks the ration as busy until
     /// [`Hints::done`].
     pub fn admit(&mut self, id: &str, now: Instant) -> bool {
+        if self.backoff.holds(now) {
+            return false;
+        }
         if self.busy.is_some_and(|t| now.duration_since(t) < STUCK) {
             return false;
         }
@@ -178,6 +243,24 @@ const GATE_WAIT: Duration = Duration::from_secs(3);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_refusal_holds_hints_back_doubling_to_ten_minutes_until_a_resolve_works() {
+        let t = Instant::now();
+        let mut h = Hints::default();
+        assert_eq!(h.backoff.refused(t), Duration::from_secs(60));
+        assert!(!h.admit("a", t + Duration::from_secs(59)), "no hints while refused");
+        assert!(h.backoff.holds(t + Duration::from_secs(59)));
+        assert!(!h.backoff.holds(t + Duration::from_secs(60)));
+        assert_eq!(h.backoff.refused(t), Duration::from_secs(120));
+        for _ in 0..6 {
+            h.backoff.refused(t);
+        }
+        assert_eq!(h.backoff.refused(t), BACKOFF_MAX, "capped");
+        h.backoff.succeeded();
+        assert!(h.admit("a", t), "a working resolve ends the hold");
+        assert_eq!(h.backoff.refused(t), BACKOFF_FIRST, "and the next run starts short again");
+    }
 
     #[test]
     fn hints_run_one_at_a_time_and_once_per_track() {

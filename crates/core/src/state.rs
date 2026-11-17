@@ -16,7 +16,7 @@ use crate::host::{Host, HostExt, MediaControls};
 use tokio::sync::Mutex;
 
 use crate::db::{now_secs, Db, StoredAccount};
-use crate::orchestrator::{Orchestrator, PlaybackData, PlaybackPing, ResolveError};
+use crate::orchestrator::{Orchestrator, PlaybackData, PlaybackPing, ResolveError, REFUSED_MESSAGE};
 
 /// Synthetic browseId for the Your Rotation playlist. Not a YouTube id: `get_playlist` intercepts it
 /// and builds the page from local play counts, so it must never collide with a real browseId
@@ -1387,12 +1387,15 @@ impl AppState {
             });
         }
         // ── stream: firstaudio ── this stream is about to play: warm its head while validating.
-        let data = crate::audioproxy::WANT_HEAD
+        let resolved = crate::audioproxy::WANT_HEAD
             .scope(
                 true,
                 self.orchestrator.resolve(video_id, is_upload, self.quality(), &self.disabled_clients()),
             )
-            .await?;
+            .await;
+        // A refusal holds the hints and the lookahead back; a working resolve lets them go.
+        crate::firstaudio::note_resolve(resolved.as_ref().err().map(ResolveError::is_transient));
+        let data = resolved?;
         // Never cache rustypipe URLs: googlevideo serves them only for bounded-Range requests,
         // which mpv doesn't send → LOADING_FAILED(-13). Caching one poisons the videoId for ~6h.
         //
@@ -2305,6 +2308,20 @@ impl AppState {
         self.media_set_playing(false);
     }
 
+    /// A resolve failure the queue must not move past ([`resolve_failure_action`]): the failed
+    /// track stays current, nothing plays, the UIs show paused and the error banner. Play (or a
+    /// tap) tries again.
+    async fn stop_on_resolve_failure(&self, video_id: &str, message: &str) {
+        self.fail_streak.store(0, Ordering::Relaxed); // a press of Play gets a fresh run
+        // The outgoing track may still be loaded (paused by `show_loading`): Play must not
+        // resume it under this one's title.
+        let _ = self.player.stop();
+        self.queue.lock().await.lookahead_loaded = None;
+        self.emit_own("playback-state", "paused");
+        self.media_set_playing(false);
+        self.emit_error(video_id, message);
+    }
+
     /// The audio device went away under a loaded file (a PC waking from sleep re-enumerates its
     /// devices, or one was unplugged). mpv ends the file with an error exactly like a dead URL
     /// does, and routing it through `on_track_failed` is what made a sleeping PC wake up playing
@@ -2507,15 +2524,34 @@ impl AppState {
                         return false;
                     }
                 }
-                Err(e) if e.affects_every_track() => {
-                    // Nothing is wrong with this track: the network is down, or YouTube is
-                    // refusing every anonymous client right now. Skipping would walk the whole
-                    // queue in a couple of seconds, toast once per track and persist the new
-                    // position, so stay exactly where we are and say what happened.
-                    self.emit_error(&item.video_id, &e.to_string());
-                    return false;
-                }
                 Err(e) => {
+                    let streak = self.fail_streak.load(Ordering::Relaxed);
+                    let action = resolve_failure_action(&e, streak);
+                    if action == ResolveFail::Skip {
+                        self.fail_streak.fetch_add(1, Ordering::Relaxed);
+                    }
+                    if action == ResolveFail::Halt {
+                        // The third track in a row YouTube said no to: stop on it, as Spotify
+                        // does, rather than walk the queue. Each one was a verdict on its video,
+                        // so this one is greyed like the others.
+                        let mut q = self.queue.lock().await;
+                        let cur = q.current;
+                        q.mark_unavailable(cur, &item.video_id, true);
+                        drop(q);
+                        self.emit_queue().await;
+                        self.persist_queue().await;
+                    }
+                    if action != ResolveFail::Skip {
+                        // Stay: nothing is wrong with this track. The network is down, or YouTube
+                        // is refusing us right now. Skipping would walk the whole queue in a
+                        // couple of seconds, toast once per track and persist the new position
+                        // (the owner's iPhone, build 13: ~70 tracks), so stay exactly where we
+                        // are, paused, and say what happened. A tap tries again, once.
+                        let message =
+                            if action == ResolveFail::Halt { REFUSED_MESSAGE.to_owned() } else { e.to_string() };
+                        self.stop_on_resolve_failure(&item.video_id, &message).await;
+                        return false;
+                    }
                     let mut q = self.queue.lock().await;
                     // Kept and greyed out, not deleted (Spotify semantics).
                     let cur = q.current;
@@ -2669,6 +2705,11 @@ impl AppState {
         // A guest plays whatever the host announces next, and a primed entry would let mpv move on
         // by itself into a track the room may not be playing.
         for _ in 0..3 {
+            // YouTube refused a resolve a moment ago: the lookahead waits out the backoff, and the
+            // track boundary resolves the next row itself (once, stopping if it is refused too).
+            if crate::firstaudio::backing_off() {
+                return;
+            }
             let next_idx = {
                 let q = self.queue.lock().await;
                 // Repeat-one primes nothing: mpv loops the file itself (next_index → None).
@@ -2716,13 +2757,22 @@ impl AppState {
                     return;
                 }
                 Err(e) => {
-                    if e.affects_every_track() {
-                        // The next track is fine; we just cannot reach YouTube. Removing it here
-                        // would delete a good row from the persisted queue, and the retry loop
-                        // would do it again to the row that moved up. Leave the queue alone and
-                        // let the next prime try again.
-                        tracing::warn!(video_id = %next_video, error = %e, "lookahead resolve failed, leaving the queue alone");
-                        return;
+                    let streak = self.fail_streak.load(Ordering::Relaxed);
+                    match resolve_failure_action(&e, streak) {
+                        ResolveFail::Stay => {
+                            // The next track is fine; YouTube is refusing us or unreachable.
+                            // Marking it would grey a good row in the persisted queue, and the
+                            // loop would do it again to the row that moved up (the iPhone's skip
+                            // storm). Leave the queue alone; the backoff holds the next prime.
+                            tracing::warn!(video_id = %next_video, error = %e, "lookahead resolve failed, leaving the queue alone");
+                            return;
+                        }
+                        // Enough in a row: stop marking. The track boundary meets this row and
+                        // stops on it there.
+                        ResolveFail::Halt => return,
+                        ResolveFail::Skip => {
+                            self.fail_streak.fetch_add(1, Ordering::Relaxed);
+                        }
                     }
                     tracing::warn!(video_id = %next_video, error = %e, "lookahead resolve failed, marking unavailable");
                     if self.generation.load(Ordering::SeqCst) != gen {
@@ -5630,6 +5680,31 @@ enum FailAction {
     Halt,
 }
 
+/// What an auto-advancing caller (the play loop, the gapless lookahead) does with a track whose
+/// resolve failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResolveFail {
+    /// Mark it unavailable and move on to the next row.
+    Skip,
+    /// Don't move: YouTube refused us or is unreachable, which says nothing about this track.
+    Stay,
+    /// Stop: the [`MAX_FAILURE_STREAK`]th failure in a row with nothing played in between.
+    Halt,
+}
+
+/// Kept pure so both callers' policy can be tested without a player or a network. `streak`:
+/// failures already in a row before this one ([`AppState::fail_streak`], reset when a track
+/// really plays). Never a skip storm: a refusal never skips, and verdicts stop at the third.
+fn resolve_failure_action(e: &ResolveError, streak: u32) -> ResolveFail {
+    if e.affects_every_track() {
+        ResolveFail::Stay
+    } else if streak + 1 >= MAX_FAILURE_STREAK {
+        ResolveFail::Halt
+    } else {
+        ResolveFail::Skip
+    }
+}
+
 /// The failure policy, kept pure so it can be tested without a player.
 /// `proxy`: the audio proxy's health, checked just now (`None`: not running, streams go direct).
 /// `streak`: failures already in a row before this one.
@@ -5666,7 +5741,7 @@ mod tests {
         upcoming_queued, QueueState, RepeatMode, VideoUrls, KEEP_PLAYED, LOCAL_PLAYLIST_PREFIX,
         MAX_BOOST_DB,
     };
-    use super::{failure_action, FailAction, MAX_FAILURE_STREAK}; // stream: proxyfix
+    use super::{failure_action, resolve_failure_action, FailAction, ResolveFail, MAX_FAILURE_STREAK}; // stream: proxyfix
     use super::{install_single, SINGLE_BATCH};
     use super::{restore_queued_rows, splice_queued_at}; // lane magic-d2
 
@@ -6365,6 +6440,57 @@ mod tests {
         assert_eq!(failure_action(Some(Health::Down), true, false, 0), FailAction::Halt);
         // One that keeps dying under every retry is bounded too.
         assert_eq!(failure_action(rebuilt, true, false, MAX_FAILURE_STREAK - 1), FailAction::Halt);
+    }
+
+    /// Drives a queue whose every resolve fails with `e` the way `load_current` does (skip bumps
+    /// the streak, anything else stops) and returns (tracks attempted, how it stopped).
+    fn walk_failing_queue(e: &crate::orchestrator::ResolveError, len: usize) -> (usize, ResolveFail) {
+        let mut streak = 0;
+        for attempted in 1..=len {
+            match resolve_failure_action(e, streak) {
+                ResolveFail::Skip => streak += 1,
+                stop => return (attempted, stop),
+            }
+        }
+        (len, ResolveFail::Skip)
+    }
+
+    // The owner's iPhone, TestFlight 1.0.1 build 13: Next in full-screen lyrics, then a new track
+    // every 1.7 s for ~70 tracks, none of them played. The play loop's path.
+    #[test]
+    fn the_play_loop_never_skip_storms() {
+        use crate::orchestrator::ResolveError as E;
+        let v = || "v".to_owned();
+        // A refusal (bot check, 403, consent page) stops on the first track, unmarked.
+        assert_eq!(walk_failing_queue(&E::Refused(v()), 70), (1, ResolveFail::Stay));
+        assert_eq!(walk_failing_queue(&E::Unreachable(v()), 70), (1, ResolveFail::Stay));
+        // Real per-video verdicts are skipped, but only twice: the third in a row stops.
+        assert_eq!(
+            walk_failing_queue(&E::AllClientsFailed(v()), 70),
+            (MAX_FAILURE_STREAK as usize, ResolveFail::Halt)
+        );
+        assert_eq!(walk_failing_queue(&E::UploadUnavailable(v()), 70).1, ResolveFail::Halt);
+        // A track that plays resets the streak (on_position/on_duration), so a dead track
+        // between good ones is still skipped.
+        assert_eq!(resolve_failure_action(&E::AllClientsFailed(v()), 0), ResolveFail::Skip);
+    }
+
+    // The same night's first symptom: "lookahead resolve failed, marking unavailable" for tracks
+    // that were fine. The lookahead's path.
+    #[test]
+    fn the_lookahead_marks_only_verdicts_and_only_until_the_streak_runs_out() {
+        use crate::orchestrator::ResolveError as E;
+        let v = || "v".to_owned();
+        for streak in 0..5 {
+            assert_eq!(resolve_failure_action(&E::Refused(v()), streak), ResolveFail::Stay);
+            assert_eq!(resolve_failure_action(&E::SignInRequired(v()), streak), ResolveFail::Stay);
+        }
+        assert_eq!(resolve_failure_action(&E::AllClientsFailed(v()), 0), ResolveFail::Skip);
+        assert_eq!(resolve_failure_action(&E::AllClientsFailed(v()), 1), ResolveFail::Skip);
+        assert_eq!(
+            resolve_failure_action(&E::AllClientsFailed(v()), MAX_FAILURE_STREAK - 1),
+            ResolveFail::Halt
+        );
     }
 
     // A healthy proxy: the track itself failed. Retry once, then advance, as before.
