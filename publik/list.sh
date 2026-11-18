@@ -126,7 +126,14 @@ esac
 fi
 
 say "publik: the app token for ${SLUG}"
-code="$(post "${API}/api/v1/apps/${SLUG}/token" "${TMP}/apptoken.json" '{}' "${TMP}/auth.hdr")"
+# publik limits how many tokens an app gets per hour: wait it out within the
+# approval (which lasts an hour) instead of asking for a new one.
+for _ in $(seq 1 13); do
+  code="$(post "${API}/api/v1/apps/${SLUG}/token" "${TMP}/apptoken.json" '{}' "${TMP}/auth.hdr")"
+  [[ "$code" == 429 ]] || break
+  echo "   publik: too many tokens this hour; trying again in 5 minutes"
+  sleep 300
+done
 TOKEN="$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\(pat_[^"]*\)".*/\1/p' "${TMP}/apptoken.json" | head -1)"
 if [[ "$code" != 2?? || "$TOKEN" != pat_* ]]; then
   url="$(field "${TMP}/apptoken.json" claim_url)"
