@@ -62,6 +62,10 @@ sha1 = "0.10"
 sha2 = "0.10"
 # Podcast chapters: ID3 CHAP/CTOC frames read from an episode's header (lofty has no CHAP support).
 id3 = { version = "1", default-features = false }
+# Device sync (sync/): end-to-end encryption, the pairing PAKE, key derivation.
+chacha20poly1305 = "0.10"
+spake2 = "0.4"
+hkdf = "0.12"
 # Already in the tree through rustypipe; the iOS bindings note is in crates/innertube/Cargo.toml.
 rquickjs = { version = "0.9", optional = true }
 
@@ -75,6 +79,11 @@ rustypipe-botguard = { version = "0.1.2", optional = true }
 # Held at 0.30: every lindera from 0.35 on needs encoding_rs >= 0.8.35, and rustypipe-botguard's
 # deno_web pins =0.8.33. 0.31 to 0.34 fetch IPADIC from hosts that are gone.
 lindera = { version = "=0.30.0", default-features = false, features = ["ipadic"], optional = true }
+
+# Device sync's LAN discovery (`_spotless-sync._tcp`). Not on iOS: raw multicast there needs an
+# entitlement, so the iPhone browses with Bonjour in Swift and hands the address to the core.
+[target.'cfg(not(target_os = "ios"))'.dependencies.mdns-sd]
+version = "0.13"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # YouTube sign-in cookies in the Keychain (secrets.rs).

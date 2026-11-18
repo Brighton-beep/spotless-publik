@@ -14,6 +14,7 @@ import { importHandlers } from './importmock'; // stream: onboard
 import { magicD3Handlers } from './magicd3'; // lane magic-d3
 import { magicD1Handlers } from './magicd1'; // lane magic-d1
 import { magicD2Handlers } from './magicd2'; // lane magic-d2
+import { syncHandlers } from './syncmock'; // device sync UI
 import {
 	NOW,
 	DEFAULT_REVERB,
@@ -1195,6 +1196,7 @@ const handlers: Record<string, (a: Args) => unknown> = {
 	add_local_folder: () => ({ folders: [], albums: [], artists: [], songs: [], removed: [] }),
 	remove_local_folder: () => ({ folders: [], albums: [], artists: [], songs: [], removed: [] }),
 	...importHandlers(emit), // stream: onboard (the Spotify import)
+	...syncHandlers(emit), // device sync (Settings › Devices, the linking dialog)
 	import_source: () => null,
 	take_launch_args: () => [],
 	can_self_update: () => false,

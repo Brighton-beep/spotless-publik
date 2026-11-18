@@ -13,6 +13,7 @@
 	import ImportStart from '$lib/import/ImportStart.svelte';
 	import { importOffer, importOfferDone } from '$lib/api';
 	import { uiPrefs } from './prefs.svelte';
+	import { offerWelcome } from '$lib/devices.svelte';
 
 	let open = $state(false);
 
@@ -38,6 +39,7 @@
 	function done() {
 		open = false;
 		importOfferDone().catch(() => {});
+		offerWelcome(); // "Using Spotless on your iPhone too?" comes next, once the import is through
 	}
 
 	/** Close this and let the import dialog take over, reading what was handed in. */

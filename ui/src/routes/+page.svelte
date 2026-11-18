@@ -17,6 +17,7 @@
 	import { podcasts } from '$lib/podcasts.svelte';
 	import ShelfCard from '$lib/discover/ShelfCard.svelte';
 	import BrowseTile from '$lib/discover/BrowseTile.svelte';
+	import DevicesHint from '$lib/settings/devices/DevicesHint.svelte';
 	import {
 		HOME_KEY,
 		HOME_STORE,
@@ -225,6 +226,7 @@
 	</div>
 
 	<div class="flex flex-col gap-8 px-[var(--spacing-home-gutter)] pt-1">
+		<DevicesHint />
 		{#if filter === 'audiobooks'}
 			<!-- ── stream: audiobooks — Audiobooks filter: continue, your books, popular, genres ── -->
 			{#if !bookShelves}

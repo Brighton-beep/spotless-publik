@@ -18,6 +18,7 @@
 //! | `encore://album/<browseId>` | `https://music.youtube.com/browse/<id>` |
 //! | `encore://artist/<channelId>` | `https://music.youtube.com/channel/<id>` |
 //! | `encore://open?url=<https url>` | that URL |
+//! | `spotless://pair?v=1&code=…` | itself: the page opens the device-linking dialog with it (docs/SYNC.md) |
 //! | `encore://music.youtube.com/…`, `encore://open.spotify.com/…` | the same path on https |
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -81,6 +82,8 @@ fn app_link(url: &tauri::Url) -> Option<String> {
             ))
         }
         "album" => Some(format!("https://music.youtube.com/browse/{}", id?)),
+        // A device-linking QR: the page joins with it as is (`sync_join { qr }`).
+        "pair" => Some(format!("spotless://pair?{}", url.query()?)),
         "artist" => Some(format!("https://music.youtube.com/channel/{}", id?)),
         "open" => {
             let target =
@@ -140,6 +143,10 @@ mod tests {
             Some("https://music.youtube.com/watch?v=abc")
         );
         assert_eq!(to_web_link("spotless://nonsense/x"), None);
+        assert_eq!(
+            to_web_link("encore://pair?v=1&code=123456&addr=10.0.0.2%3A47615").as_deref(),
+            Some("spotless://pair?v=1&code=123456&addr=10.0.0.2%3A47615")
+        );
         assert!(is_app_link("spotless://track/x") && is_app_link("encore://track/x"));
         assert!(!is_app_link("https://music.youtube.com/watch?v=x") && !is_app_link("--autostart"));
     }

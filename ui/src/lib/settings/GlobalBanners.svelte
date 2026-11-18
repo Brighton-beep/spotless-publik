@@ -9,7 +9,8 @@
 	 * - Settings › Display "Open Now Playing view on play": opens the right panel when a new queue
 	 *   starts.
 	 * - The legacy `ui.settingsOpen` flag is routed to the page.
-	 * - The first-run "Bring your music from Spotify" step.
+	 * - The first-run "Bring your music from Spotify" step, then "Using Spotless on your iPhone too?".
+ * - The device-linking dialog (devices.svelte.ts opens it from anywhere).
 	 */
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -26,6 +27,8 @@
 	import { downloads } from '$lib/downloads.svelte'; // stream: parity3
 	import { toast } from '$lib/kit/toast';
 	import Welcome from './Welcome.svelte';
+	import PairDialog from './devices/PairDialog.svelte';
+	import LinkWelcome from './devices/LinkWelcome.svelte';
 
 	// ── offline ──
 	let offline = $state(typeof navigator !== 'undefined' && !navigator.onLine);
@@ -158,3 +161,5 @@
 {/if}
 
 <Welcome />
+<LinkWelcome />
+<PairDialog />

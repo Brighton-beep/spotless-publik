@@ -259,6 +259,16 @@ protocol CoreClient: AnyObject, Sendable {
     /// The library zip (CSV, M3U, XSPF) written to `path`.
     func libExport(path: String) async throws -> LibraryExportReport                       // lib_export
 
+    // Device sync (docs/SYNC.md; Core/DeviceSync.swift). Errors are the core's codes (`wrong_code:2`, `not_pairing`, `no_host`).
+    func syncStatus() async throws -> SyncStatus                                           // sync_status
+    func syncStartPairing() async throws -> SyncPairingStart                               // sync_start_pairing
+    func syncCancelPairing() async throws -> SyncStatus                                    // sync_cancel_pairing
+    /// `qr`: a `spotless://pair` link; `host`/`port`: a device showing a code, found with Bonjour.
+    func syncJoin(code: String?, qr: String?, host: String?, port: Int?) async throws -> SyncStatus // sync_join
+    func syncUnpair() async throws -> SyncStatus                                           // sync_unpair
+    func syncNow() async throws -> SyncStatus                                              // sync_now
+    func syncSetActive(_ active: Bool) async throws -> SyncStatus                          // sync_set_active
+
     // events
     func setListener(_ listener: CoreEventListener?)
 }
@@ -304,6 +314,8 @@ enum CoreEvent {
     case homeChanged
     case importProgress(ImportSnapshot)
     case playbackParams(PlaybackEffects)
+    /// Device sync's status changed (`sync-changed`); remote data also fires library/home events.
+    case syncChanged(SyncStatus)
     case unknown(String)
 
     static func decode(name: String, json: Data) -> CoreEvent {
@@ -339,6 +351,9 @@ enum CoreEvent {
         case "made-for-you-changed": return .madeForYouChanged
         case "home-changed": return .homeChanged
         case "import-progress": if let s = try? d.decode(ImportSnapshot.self, from: json) { return .importProgress(s) }
+        case "sync-changed":
+            struct S: Decodable { var status: SyncStatus }
+            if let s = try? d.decode(S.self, from: json) { return .syncChanged(s.status) }
         case "playback-params":
             if let e = try? d.decode(PlaybackEffects.self, from: json) { return .playbackParams(e) }
         default: break

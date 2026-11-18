@@ -54,6 +54,7 @@ pub mod state;
 #[cfg(test)]
 mod instant_tests; // stream: instant
 pub mod stats;
+pub mod sync; // device sync (docs/SYNC.md)
 pub mod videoproxy;
 
 #[cfg(test)]

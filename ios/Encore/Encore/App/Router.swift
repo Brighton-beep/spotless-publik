@@ -180,6 +180,7 @@ final class Router {
             if t == .search, param("suggest") == "1" { searchSuggest = true }
             if t == .home, let c = param("chip") { homeChip = c.capitalized }
             if t == .home, param("scroll") == "end" { homeScrollEnd = true }
+            if t == .home, param("synchint") == "1" { app.devices.forceHint = true } // the one-time link hint (screenshots)
             if t == .search, param("focus") == "1" { searchFocused = true }
             if t == .search, param("results") != nil { searchFocused = false; paths[t] = [.searchResults(param("results") ?? "")] }
             if t == .library {
@@ -303,7 +304,7 @@ final class Router {
                 if param("smart") == "1" { try? await Task.sleep(nanoseconds: 300_000_000); _ = await app.settings.setSmartShuffle(true) }
                 if param("open") == "1" { nowPlayingOpen = true }
             }
-        default: handleMore(host: host, id: id, param: param, app: app)
+        default: handleMore(host: host, id: id, param: param, app: app, url: url)
         }
     }
 }

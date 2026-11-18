@@ -53,6 +53,7 @@ mod migrate;
 mod mini;
 mod notify;
 mod session;
+mod sync; // device sync (docs/SYNC.md)
 mod tray;
 mod webproxy;
 mod webview;
@@ -1333,6 +1334,14 @@ pub fn run() {
             commands::diagnostics_summary,
             commands::save_diagnostics,
             commands::log_ui,
+            // ── device sync (docs/SYNC.md) ──
+            sync::sync_status,
+            sync::sync_start_pairing,
+            sync::sync_cancel_pairing,
+            sync::sync_join,
+            sync::sync_unpair,
+            sync::sync_now,
+            sync::sync_set_active,
             // ── stream: library ──
             library::lib_snapshot,
             library::lib_liked_ids,

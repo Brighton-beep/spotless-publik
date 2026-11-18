@@ -220,6 +220,9 @@ pub fn start_services(b: &Booted) {
     // Local music artwork reaches the webview over the asset protocol, whose configured
     // scope is empty — the folders it may read are the ones the user picked (local.rs).
     crate::local::allow_music_paths(&*st.host, db);
+
+    // Device sync: last, because its change-log triggers go on tables every module above made.
+    crate::sync::start(st);
 }
 
 /// Restore the queue, bootstrap visitorData / the client version, pump player events, and run the

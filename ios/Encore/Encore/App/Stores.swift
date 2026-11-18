@@ -307,6 +307,8 @@ final class AppModel {
     let settings: SettingsStore
     /// The optional YouTube account (stream ios-p2, Screens/YouTubeSignIn.swift).
     let account: AccountStore
+    /// Device sync: Settings › Devices, the linking sheet, the welcome and the Home hint.
+    let devices: DeviceSyncStore
     let router = Router()
     var toast: ToastMessage?
     /// Music's tempo, pitch and reverb for this session (Speed & pitch, `setEffects`).
@@ -357,6 +359,7 @@ final class AppModel {
         downloads = DownloadStore(core: core)
         settings = SettingsStore(core: core)
         account = AccountStore(core: core, settings: settings)
+        devices = DeviceSyncStore(core: core, prefs: store)
         home = HomeStore(core: core)
         let saved = viewPrefs.load()
         librarySorts = saved.sorts
@@ -434,6 +437,7 @@ final class AppModel {
         await books.refresh()
         await downloads.refresh()
         await account.start()
+        await devices.refresh()
         StreamQuality.shared.attach(self)
     }
 
@@ -504,6 +508,7 @@ final class AppModel {
         // Spotify keeps one speed for podcasts; music has its own session effects (`effects`).
         // Only an episode's rate is the remembered one.
         case .playbackParams(let e): if currentIsEpisode { settings.speed = e.speed }
+        case .syncChanged(let s): devices.apply(s)
         case .unknown(let name): account.handle(event: name)
         }
         player.timeTap() // stream: instant

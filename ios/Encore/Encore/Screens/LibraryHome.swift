@@ -570,6 +570,7 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: Space.m) {
                         chipRow
                             .id("top")
+                        if app.devices.showsHint && !offline { DeviceLinkHint().padding(.horizontal, Space.gutter) }
                         if let n = shelves.first(where: { $0.layout == .notice }) { notice(n) }
                         if let s = shelves.first(where: { $0.layout == .shortcuts }) { shortcuts(s.items) }
                     }

@@ -1,0 +1,61 @@
+--- a/src/data/legal.tsx
++++ b/src/data/legal.tsx
+@@ -21,7 +21,7 @@
+ 
+ export const LEGAL: Partial<Record<string, AppLegal>> = {
+   spotless: {
+-    updated: "November 16, 2026",
++    updated: "November 17, 2026",
+     privacy: {
+       title: "Spotless privacy policy",
+       intro: "Applies to Spotless for Mac and iPhone.",
+@@ -29,7 +29,8 @@
+         <>
+           <p className="mt-8 text-[18px] leading-relaxed text-ink">
+             <strong>In short: Spotless collects no data.</strong> There is no account, no analytics, no advertising, no tracking and no crash reporting.
+-            The developer runs no server and receives nothing from the app. Everything you do in Spotless stays on your device.
++            The developer receives nothing from the app. Everything you do in Spotless stays on your devices; if you turn on device sync, it travels between
++            them end-to-end encrypted, and not even the sync relay can read it.
+           </p>
+ 
+           <H>What stays on your device</H>
+@@ -38,7 +39,7 @@
+             <li>Your listening history, listening stats and the mixes and recommendations made from them. They are worked out on the device.</li>
+             <li>Downloads, settings and the app&apos;s caches.</li>
+           </Ul>
+-          <p className="mt-4">Spotless never uploads this data. Deleting the app deletes it.</p>
++          <p className="mt-4">Spotless never uploads this data in a form anyone else can read (see Device sync below). Deleting the app deletes it.</p>
+ 
+           <H>Services the app contacts</H>
+           <p className="mt-4">
+@@ -66,6 +67,30 @@
+             <li>Signing out removes the stored cookies.</li>
+           </Ul>
+ 
++          <H>Device sync (optional)</H>
++          <p className="mt-4">
++            You can pair your Mac and iPhone so your library stays the same on both. Sync is off until you pair, and you can unpair at any time on either device.
++          </p>
++          <Ul>
++            <li>You pair once, with the devices near each other, by typing a one-time 6-digit code or scanning a QR code. No account is involved.</li>
++            <li>
++              What syncs: your library (liked songs, playlists, folders, pins, saved albums, artists and shows), your listening history and the signals
++              recommendations are made from, blocked artists, podcast follows and progress, audiobook progress, and your settings. Downloads, the output
++              device, volume, window layout, caches and sign-in cookies stay on each device.
++            </li>
++            <li>
++              Everything that syncs is encrypted on your device with a key that only your paired devices hold (XChaCha20-Poly1305, kept in the system
++              Keychain). Nobody else can read it or change it unnoticed, including the developer.
++            </li>
++            <li>When both devices are on the same network, they sync directly with each other and nothing leaves your network.</li>
++            <li>
++              Otherwise, encrypted batches pass through a small relay at opena.tech. It stores them, unreadable, for at most 30 days so the other device can
++              collect them, and keeps no account. It sees only a random pair identifier, the size and time of each batch, and your IP address, which is
++              used for rate limiting and not stored.
++            </li>
++            <li>Unpairing deletes the pair&apos;s mailbox on the relay. Your data stays on each device.</li>
++          </Ul>
++
+           <H>Diagnostics</H>
+           <p className="mt-4">
+             Spotless keeps a log file on your device to help fix problems. It is never sent anywhere. If you report a bug, you can choose to copy diagnostic

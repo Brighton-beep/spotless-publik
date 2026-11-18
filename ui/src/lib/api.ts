@@ -2203,3 +2203,41 @@ export const searchLyrics = (query: string) => invoke<LyricMatch[]>('search_lyri
 export const searchBlendLyrics = (query: string, songs: SongItem[], lyric: LyricMatch[], interacted: boolean, topTitle?: string) =>
 	invoke<LyricBlend>('search_blend_lyrics', { query, songs, lyric, interacted, topTitle });
 // ── end stream: search2 ──
+
+// ── device sync (docs/SYNC.md) ──
+// Commands and the `sync-changed` event. Screens: devices.ts (words, rules), devices.svelte.ts, settings/devices/.
+export type SyncPeer = { id: string; name: string; platform: string; lastSeen: number; lan: boolean };
+export type SyncPairing = { code: string; qr: string; expiresAt: number };
+export type SyncStatus = {
+	paired: boolean;
+	deviceId: string;
+	deviceName: string;
+	platform: string;
+	pairId: string | null;
+	peers: SyncPeer[];
+	/** This device's changes not yet delivered to any peer. */
+	pending: number;
+	lastSync: number | null;
+	lastError: string | null;
+	relay: { enabled: boolean; ok: boolean | null };
+	lanPort: number | null;
+	pairing: SyncPairing | null;
+	syncing: boolean;
+	active: boolean;
+};
+export const syncStatus = () => invoke<SyncStatus>('sync_status');
+/** Show a code on this device: `{ code, qr, expiresAt, port, addrs }`. */
+export const syncStartPairing = () =>
+	invoke<SyncPairing & { port: number; addrs: string[] }>('sync_start_pairing');
+export const syncCancelPairing = () => invoke<SyncStatus>('sync_cancel_pairing');
+/** Join with the code (and the QR payload, or a host/port from Bonjour; with neither the Mac looks on the LAN). */
+export const syncJoin = (code: string | null, qr?: string, host?: string, port?: number) =>
+	invoke<SyncStatus>('sync_join', { code, qr, host, port });
+export const syncUnpair = () => invoke<SyncStatus>('sync_unpair');
+export const syncNow = () => invoke<SyncStatus>('sync_now');
+/** The window gained or lost focus: polls speed up or slow down. */
+export const syncSetActive = (active: boolean) => invoke<SyncStatus>('sync_set_active', { active });
+export const onSyncChanged = (
+	cb: (p: { status: SyncStatus; entities: string[] }) => void
+): Promise<UnlistenFn> =>
+	listen<{ status: SyncStatus; entities: string[] }>('sync-changed', (e) => cb(e.payload));

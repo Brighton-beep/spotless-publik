@@ -114,7 +114,7 @@ extension Router {
     }
 
     /// encore:// hosts added by this stream (called from `handle`'s default branch).
-    func handleMore(host: String, id: String?, param: (String) -> String?, app: AppModel) {
+    func handleMore(host: String, id: String?, param: (String) -> String?, app: AppModel, url: URL? = nil) {
         switch host {
         case "song": if let id { open(.song(id), app: app) }
         case "open": if let raw = param("url"), let t = LinkTarget.parse(raw) { open(t, app: app) }
@@ -139,7 +139,26 @@ extension Router {
                 let i = min(index, page.items.count - 1)
                 app.player.play(page.items, at: i, context: PlayContext(kind: .album, id: id, title: page.title ?? ""))
             }
-        case "share":
+        case "pair":
+            // spotless://pair?v=1&code=…&addr=… (the QR another device shows, opened by the camera).
+            app.router.dismissOverlays()
+            let raw = url?.absoluteString ?? ""
+            if let qr = CodeEntry.pairLink(in: raw) { app.devices.openJoin(qr: qr) }
+        case "link-device":
+            // spotless://link-device[?step=show|enter|scan|success&code=12&error=<core error>]: the
+            // linking sheet (side menu, Settings; screenshots and tests reach each state).
+            let d = app.devices
+            switch param("step") {
+            case "show": d.open(.showCode)
+            case "enter": d.open(.enterCode)
+            case "scan": d.open(.scan)
+            case "success": d.open(.success)
+            default: d.open()
+            }
+            if let c = param("code") { d.digits = c }
+            if let e = param("error") { d.error = e == "local_network" ? .localNetwork : PairingError.from(e) }
+            if let end = param("end") { d.codeEnd = end == "tries" ? .tooManyTries : .expired }
+        case "link-welcome": app.devices.welcomeOpen = true
             // encore://share: the current song's share sheet (screenshots).
             if let s = app.player.current { ShareSheet.present(.song(s), app: app) }
         default: break

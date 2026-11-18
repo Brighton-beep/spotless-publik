@@ -52,6 +52,7 @@ private struct LaunchCover: View {
 /// The app once a core is up.
 private struct AppRoot: View {
     let app: AppModel
+    @Environment(\.scenePhase) private var phase
     var body: some View {
         RootView()
             .environment(app)
@@ -66,6 +67,7 @@ private struct AppRoot: View {
                 let env = ProcessInfo.processInfo.environment
                 if UserDefaults.standard.string(forKey: "deeplink") == nil, env["XCTestConfigurationFilePath"] == nil,
                    !ProcessInfo.processInfo.arguments.contains("-uitest"), await app.shouldOfferImport() {
+                    app.devices.welcomePending = true // "Using Spotless on your Mac too?" once the import closes
                     app.importOpen = true
                 }
                 // `-deeplink encore://…` launch argument: screenshots and UI tests reach a screen
@@ -77,6 +79,10 @@ private struct AppRoot: View {
                 }
             }
             .onOpenURL { app.router.handle($0, app: app) }
+            // Device sync polls fast in front and slowly behind; coming back syncs at once.
+            .onChange(of: phase) { _, p in
+                if p == .active { app.devices.setActive(true) } else if p == .background { app.devices.setActive(false) }
+            }
     }
 }
 

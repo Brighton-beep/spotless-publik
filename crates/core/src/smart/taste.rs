@@ -386,6 +386,10 @@ pub fn load_signals(db: &Db) -> Vec<Signal> {
 // they were heard. Coarser than Spotify (a song in two playlists is out from both), and the right
 // side to err on for "this playlist is my kid's, don't learn from it".
 
+pub(crate) fn ensure_excluded_tables(c: &rusqlite::Connection) {
+    ensure_excluded(c)
+}
+
 fn ensure_excluded(c: &rusqlite::Connection) {
     let _ = c.execute_batch(
         "CREATE TABLE IF NOT EXISTS taste_excluded (

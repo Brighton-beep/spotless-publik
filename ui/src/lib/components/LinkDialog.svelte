@@ -12,6 +12,8 @@
 	import { playLinkedSong, toast, ui } from '$lib/player.svelte';
 	import { t } from '$lib/i18n.svelte';
 	import { isSpotifyLink, openSpotifyLink } from '$lib/import.svelte';
+	import { isPairLink } from '$lib/devices';
+	import { openPairing } from '$lib/devices.svelte';
 
 	let url = $state('');
 
@@ -48,6 +50,9 @@
 		const fromArgs = (args: string[]) => {
 			const given = args.filter((a) => !a.startsWith('-'));
 			if (!given.length) return;
+			// A device-linking QR (`spotless://pair?…`, deeplink.rs passes it through): join with it.
+			const pair = given.find(isPairLink);
+			if (pair) return openPairing({ qr: pair });
 			const spotify = given.find(isSpotifyLink);
 			if (spotify) return openSpotifyLink(spotify);
 			const target = given.map(parseYtLink).find((x) => x);

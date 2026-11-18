@@ -369,8 +369,15 @@ pub async fn set_setting(state: &Arc<AppState>, key: &str, value: &str) -> Resul
     let quality_changed =
         key == "quality" && state.db.get_setting("quality").as_deref() != Some(value);
     state.db.set_setting(key, value);
+    setting_applied(state, key, value, quality_changed).await;
+    Ok(())
+}
+
+/// Apply a stored setting to whatever is live. `set_setting` calls it after a change from this
+/// device's UI, and device sync (sync/mod.rs) after a change that came from another device.
+pub async fn setting_applied(state: &Arc<AppState>, key: &str, value: &str, quality_changed: bool) {
     // Cached stream URLs were picked at the old quality: drop them, and the primed next track.
-    if quality_changed {
+    if quality_changed && key == "quality" {
         state.quality_changed().await;
     }
     // A music video track already playing gets its picture now rather than from the next track.
@@ -412,7 +419,6 @@ pub async fn set_setting(state: &Arc<AppState>, key: &str, value: &str) -> Resul
     if key == "lyrics_providers" || key == "lyrics_prefer_words" {
         state.db.clear_lyrics_cache();
     }
-    Ok(())
 }
 
 pub async fn get_settings(state: &Arc<AppState>) -> Result<serde_json::Value, String> {

@@ -199,6 +199,15 @@ pub(crate) async fn dispatch(st: &Arc<AppState>, cmd: &str, a: Args) -> Result<V
         }
         "rate" => ok(api::rate(st, a.get("videoId")?, a.get::<Rating>("rating")?).await?),
 
+        // ── device sync (docs/SYNC.md); `sync-changed` events ──
+        "sync_status" => ok(encore_core::sync::sync_status().await?),
+        "sync_start_pairing" => ok(encore_core::sync::sync_start_pairing().await?),
+        "sync_cancel_pairing" => ok(encore_core::sync::sync_cancel_pairing().await?),
+        "sync_join" => ok(encore_core::sync::sync_join(a.get("code")?, a.get("qr")?, a.get("host")?, a.get("port")?).await?),
+        "sync_unpair" => ok(encore_core::sync::sync_unpair().await?),
+        "sync_now" => ok(encore_core::sync::sync_now().await?),
+        "sync_set_active" => ok(encore_core::sync::sync_set_active(a.get("active")?).await?),
+
         // ── library (local, no account) ──
         "lib_snapshot" => ok(library::lib_snapshot(st).await?),
         "lib_liked_songs" => ok(library::lib_liked_songs(st).await?),

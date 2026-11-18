@@ -34,6 +34,8 @@ final class MockCoreClient: CoreClient, @unchecked Sendable {
 
     /// Podcasts, audio, smart2, downloads, folders, settings, import (MockCoreClient+Features.swift).
     var fs = MockFeatureState()
+    /// Device sync (Core/DeviceSync.swift).
+    var sync = MockSyncState()
 
     /// `latency` simulates the core's round trip (0 in tests and screenshots).
     var latency: UInt64 = 0

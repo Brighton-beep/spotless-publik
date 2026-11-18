@@ -18,6 +18,9 @@
 		<key>CFBundleURLSchemes</key><array><string>spotless</string><string>encore</string></array>
 	</dict></array>
 	<key>LSRequiresIPhoneOS</key><true/>
+	<key>NSCameraUsageDescription</key><string>Spotless uses the camera to scan the code that links your devices.</string>
+	<key>NSLocalNetworkUsageDescription</key><string>Spotless finds your other devices on this Wi-Fi to link them.</string>
+	<key>NSBonjourServices</key><array><string>_spotless-sync._tcp</string></array>
 	<key>UIFileSharingEnabled</key><true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key><false/>
 	<key>CFBundleDocumentTypes</key>

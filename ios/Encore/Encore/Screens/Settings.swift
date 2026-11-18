@@ -165,6 +165,8 @@ struct SettingsView: View {
 
     var body: some View {
         SettingsScaffold(title: "Settings and privacy") {
+            // First, so linking a Mac is easy to find (Screens/Devices.swift).
+            DevicesSection()
             Button { app.router.push(.settingsPage(.account)) } label: {
                 HStack(spacing: Space.m) {
                     ProfileAvatar(size: 56)
@@ -184,7 +186,7 @@ struct SettingsView: View {
                 SettingsNavRow(icon: icon, title: page.title, subtitle: sub) { app.router.push(.settingsPage(page)) }
             }
         }
-        .task { await app.settings.refresh() }
+        .task { await app.settings.refresh(); await app.devices.refresh() }
     }
 }
 
@@ -245,6 +247,11 @@ struct SideMenu: View {
             menuRow("clock-counter-clockwise", "Recents", dot: false) { go(.history) }
             menuRow("chart-bar", "Listening stats", dot: false) { go(.stats) }
             menuRow("gear", "Settings and privacy", dot: false) { go(.settings) }
+            // Device sync: link a Mac, or (linked) its status at the top of Settings.
+            menuRow("devices", DeviceSyncText.menuTitle(paired: app.devices.paired), dot: false) {
+                if app.devices.paired { go(.settings) } else { close(); app.devices.open() }
+            }
+            .accessibilityIdentifier("side-menu-devices")
             Spacer()
         }
         .foregroundStyle(Palette.text)

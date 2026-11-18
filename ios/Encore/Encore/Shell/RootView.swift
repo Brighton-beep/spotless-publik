@@ -49,7 +49,16 @@ struct RootView: View {
                 .presentationBackground { SheetGlass() }
                 .presentationCornerRadius(Radius.glassSheet)
         }
-        .fullScreenCover(isPresented: $app.importOpen) { ImportOnboarding().environment(app) }
+        .fullScreenCover(isPresented: $app.importOpen, onDismiss: { app.devices.importClosed() }) { ImportOnboarding().environment(app) }
+        // Device sync: link a Mac (Screens/Devices.swift), and the first-run offer after the import.
+        .sheet(isPresented: Bindable(app.devices).sheetOpen, onDismiss: { app.devices.closed() }) {
+            LinkDeviceSheet().environment(app)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground { SheetGlass() }
+                .presentationCornerRadius(Radius.glassSheet)
+        }
+        .fullScreenCover(isPresented: Bindable(app.devices).welcomeOpen) { DeviceLinkWelcome().environment(app) }
         #if DEBUG
         .sheet(isPresented: Bindable(app.router).debugOpen) { DebugAudioMenu() }
         #endif

@@ -18,6 +18,7 @@
 	import VideoSurface from '$lib/components/VideoSurface.svelte';
 	import { auth, initApp, playback, ui } from '$lib/player.svelte';
 	import { initWin } from '$lib/win.svelte';
+	import { initDevices } from '$lib/devices.svelte';
 	import { initZoom } from '$lib/zoom.svelte';
 	import { initShortcuts } from '$lib/shortcuts';
 	import { initErrorLog } from '$lib/errlog';
@@ -190,11 +191,13 @@
 		initAudio().catch(() => {});
 		initPodcasts().catch?.(() => {});
 		reloadSavedBooks().catch(() => {}); // stream: audiobooks
+		const teardownDevices = initDevices(); // device sync: status, focus → sync_set_active
 		// stream: perf — dev-only timing probe, only when launched with ENCORE_PERF (lib.rs).
 		const perfMode = window.__ENCORE_PERF__;
 		if (perfMode) import('$lib/perfprobe').then((m) => m.runProbe(perfMode, mountedAt));
 		return () => {
 			clearInterval(updateTimer);
+			teardownDevices();
 			teardownApp();
 			teardownWin();
 			teardownZoom();

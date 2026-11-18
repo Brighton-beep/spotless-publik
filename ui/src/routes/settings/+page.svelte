@@ -46,6 +46,7 @@
 	import Row from '$lib/settings/Row.svelte';
 	import { checkForUpdatesInteractive, installUpdate, openDownloadPage, updateState } from '$lib/updater.svelte';
 	import RecoverPlaylists from '$lib/settings/RecoverPlaylists.svelte'; // stream: magic-d4
+	import DevicesSection from '$lib/settings/devices/DevicesSection.svelte';
 	import Switch from '$lib/settings/Switch.svelte';
 	import Select from '$lib/settings/Select.svelte';
 	import { setPref, uiPrefs } from '$lib/settings/prefs.svelte';
@@ -426,6 +427,9 @@
 		{#if noMatch}
 			<p class="py-8 text-base text-text-subdued">No settings match “{query.trim()}”.</p>
 		{/if}
+
+		<!-- Devices (device sync) comes first: the one way to reach the iPhone. -->
+		<DevicesSection />
 
 		<!-- Account -->
 		<section data-settings-section>

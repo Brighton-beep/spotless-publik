@@ -7,6 +7,8 @@ import { auth, startSignIn } from '$lib/player.svelte';
 import { lib } from '$lib/library.svelte';
 import { openMenu, type MenuEntry, type MenuTarget } from '$lib/kit/menus';
 import { goSettings, importFromSpotify, togglePrivateSession } from './actions';
+import { linked, openPairing } from '$lib/devices.svelte';
+import { W } from '$lib/devices';
 
 export function profileMenuEntries(): MenuEntry[] {
 	const account = auth.account;
@@ -15,6 +17,8 @@ export function profileMenuEntries(): MenuEntry[] {
 		{ label: 'Listening stats', onSelect: () => goto('/stats') },
 		{ label: 'Recently played', onSelect: () => goto('/history') },
 		{ label: 'Import from Spotify', onSelect: importFromSpotify },
+		// Device sync: link the iPhone, or (linked) see it in Settings › Devices.
+		linked() ? { label: W.menuLinked, onSelect: () => goSettings('devices') } : { label: W.menuLink, onSelect: () => openPairing() },
 		{ label: 'Private session', checked: lib.privateSession.enabled, onSelect: togglePrivateSession },
 		{ label: 'Settings', hint: '⌘,', onSelect: () => goSettings() },
 		{ type: 'separator' },
