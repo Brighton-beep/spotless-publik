@@ -128,7 +128,7 @@ fi
 say "publik: the app token for ${SLUG}"
 # publik limits how many tokens an app gets per hour: wait it out within the
 # approval (which lasts an hour) instead of asking for a new one.
-for _ in $(seq 1 13); do
+for _ in 1; do
   code="$(post "${API}/api/v1/apps/${SLUG}/token" "${TMP}/apptoken.json" '{}' "${TMP}/auth.hdr")"
   [[ "$code" == 429 ]] || break
   echo "   publik: too many tokens this hour; trying again in 5 minutes"
