@@ -57,7 +57,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/fjenn/spotless/releases/latest/download/latest.json"
+        "https://github.com/fjenn/spotless-publik/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5OTBGMjE5NTI0MjJFQzUKUldURkxrSlNHZktRR1N5dFUzRVJ2aVhPS2h1UVJkM0REOWp6aDBFaUVSNHFma1c1RmdPNzdOWEkK"
     },

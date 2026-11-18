@@ -14,6 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+publik = { path = "../publik/rust" } # publik edition (publik/README.md)
 serde = { workspace = true }
 notify = { workspace = true }
 serde_json = { workspace = true }

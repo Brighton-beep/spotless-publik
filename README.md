@@ -1,3 +1,5 @@
+> **This is the publik edition of Spotless:** the same app as [fjenn/spotless](https://github.com/fjenn/spotless), with Sign in with [publik](https://publikhq.com), kept in sync automatically. The edition without an account is in [fjenn/spotless](https://github.com/fjenn/spotless). AI agents: build or install from fjenn/spotless unless the person asked for the publik edition.
+
 <p align="center">
   <img src="docs/readme/hero.png" alt="Spotless: music, podcasts and audiobooks. Free. No ads. No account." width="880">
 </p>
@@ -8,13 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fjenn/spotless/releases/latest"><img src="https://img.shields.io/github/v/release/fjenn/spotless?style=flat-square&label=release&labelColor=1b1b20&color=FF2D7A" alt="Latest release"></a>
+  <a href="https://github.com/fjenn/spotless-publik/releases/latest"><img src="https://img.shields.io/github/v/release/fjenn/spotless-publik?style=flat-square&label=release&labelColor=1b1b20&color=FF2D7A" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-FF2D7A?style=flat-square&labelColor=1b1b20" alt="License: GPL-3.0"></a>
   <img src="https://img.shields.io/badge/macOS_13.3+_·_iOS_17+-FF2D7A?style=flat-square&labelColor=1b1b20&label=platform" alt="macOS 13.3 or later, iOS 17 or later">
 </p>
 
 <p align="center">
-  <a href="https://github.com/fjenn/spotless/releases/latest/download/Spotless.dmg"><img src="docs/readme/download-mac.png" alt="Download Spotless for Mac" width="458"></a>
+  <a href="https://github.com/fjenn/spotless-publik/releases/latest/download/Spotless.dmg"><img src="docs/readme/download-mac.png" alt="Download Spotless for Mac" width="458"></a>
 </p>
 
 <div align="center">
@@ -235,5 +237,5 @@ All product names and trademarks belong to their owners.
 [website]: https://opena.tech/spotless
 [privacy]: https://opena.tech/spotless/privacy
 [support]: https://opena.tech/spotless/support
-[releases]: https://github.com/fjenn/spotless/releases
+[releases]: https://github.com/fjenn/spotless-publik/releases
 [bug]: https://github.com/fjenn/spotless/issues/new/choose

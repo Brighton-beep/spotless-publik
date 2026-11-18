@@ -674,6 +674,8 @@ fn should_start_minimized(db: &Db) -> bool {
 /// the persisted session, wires every command and plugin, and runs the event loop. context/01
 /// §startup.
 pub fn run() {
+    // publik edition: the app's version for publik, and its release self test (publik/README.md).
+    publik::start(env!("CARGO_PKG_VERSION"));
     // One tokio runtime for the core and Tauri: the core's background loops and Tauri's commands
     // share a pool, as they did when the core spawned onto `tauri::async_runtime`.
     tauri::async_runtime::set(encore_core::rt::handle());
@@ -860,6 +862,8 @@ pub fn run() {
         )
         .setup(move |app| {
             let handle = app.handle().clone();
+            // publik edition: sign in with publik before the app (publik/README.md).
+            publik::gate::spawn(&handle);
 
             // Before anything opens a file or a window: a move ends this process.
             #[cfg(target_os = "macos")]
@@ -1114,6 +1118,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(only_ui(tauri::generate_handler![
+            // publik edition: the sign-in screen (publik/README.md).
+            publik::gate::publik_gate_screen,
+            publik::gate::publik_gate_press,
             // ── stream: smart ──
             smart::commands::smart_settings,
             smart::commands::smart_set_setting,

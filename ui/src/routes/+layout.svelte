@@ -3,6 +3,7 @@
 	// top bar 64px, three rounded #121212 panels (library | main | right panel) with resizable
 	// widths, player bar 72px. The mini player window renders only <MiniPlayer/>.
 	import './layout.css';
+	import PublikGate from '$lib/publik/Gate.svelte'; // publik edition (publik/README.md)
 	import favicon from '$lib/assets/favicon.svg';
 	import { browser } from '$app/environment';
 	import { afterNavigate, goto } from '$app/navigation';
@@ -372,3 +373,6 @@
 		{/if}
 	</Tooltip.Provider>
 {/if}
+
+<!-- publik edition: sign in with publik before the app (publik/README.md). -->
+<PublikGate />
