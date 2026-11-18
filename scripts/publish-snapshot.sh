@@ -30,14 +30,17 @@
 #     (the upstream author's sponsor links) and Limusic's release/CI workflows (Linux/Windows
 #     releases, its website, nightly stream health), which would run against the public repo with
 #     secrets it does not have. Our own workflows are kept (everything else in .github/workflows/):
-#     ci.yml (checks) and release-mac.yml (signed, notarized Mac releases from the repo's secrets,
-#     docs/RELEASING.md); a guard below stops the export if one is missing. There is no GitHub
+#     ci.yml (checks), release-mac.yml (signed, notarized Mac releases from the repo's secrets)
+#     and release-ios.yml (TestFlight uploads; it needs ios/Encore/ExportOptions.plist), see
+#     docs/RELEASING.md; a guard below stops the export if one of them is missing. There is no GitHub
 #     Pages site: the website is opena.tech/spotless, hosted elsewhere.
 #   - crates/core/tests/fixtures/lyrics: the lyrics benchmark's captured provider answers, which
 #     are the full lyrics of 100+ songs (the test that reads them skips when they are absent).
 #   - Junk: __pycache__, *.pyc, .DS_Store.
 # Rewritten (TRANSFORM below): the Apple team ID in ios/Encore (project.yml + project.pbxproj) is
-# blanked; builders set their own in Xcode. It is not secret, but it is not needed either.
+# blanked; builders set their own in Xcode, and release-ios.yml writes it back at build time (from
+# the APPLE_TEAM_ID repo variable, or App Store Connect). ios/Encore/ExportOptions.plist is committed
+# with an empty teamID for the same reason. It is not secret, but it is not needed either.
 #
 # Then the scan (scan() below) runs over the result and the script stops on any hit that is not on
 # its allow-list, before anything is committed.
@@ -55,7 +58,7 @@ while [ $# -gt 0 ]; do
     --out) OUT="$2"; shift ;;
     --message) MSG="$2"; shift ;;
     --scan-only) SCAN_ONLY="$2"; shift ;;
-    -h|--help) sed -n '2,43p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,46p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
   shift
@@ -179,7 +182,8 @@ for n in "${EXCLUDE_NAMES[@]}"; do
 done
 
 # The public repo builds its releases itself; never publish it without the workflows that do that.
-for wf in .github/workflows/release-mac.yml .github/workflows/ci.yml; do
+for wf in .github/workflows/release-mac.yml .github/workflows/release-ios.yml .github/workflows/ci.yml \
+          ios/Encore/ExportOptions.plist scripts/ci/asc-team-id.rb; do
   [ -f "$STAGE/$wf" ] || die "$wf is missing from the export (deleted, or caught by EXCLUDE?)"
 done
 

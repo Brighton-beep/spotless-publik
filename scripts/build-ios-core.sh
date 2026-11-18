@@ -3,6 +3,8 @@
 #   scripts/build-ios-core.sh            simulator + device, debug
 #   scripts/build-ios-core.sh --sim      simulator only (what the unit test needs)
 #   scripts/build-ios-core.sh --release  optimized (thin LTO; slow)
+#   scripts/build-ios-core.sh --device   device only (an App Store archive needs nothing else;
+#                                        CI's release-ios.yml uses --release --device)
 # Output: ios/EncoreCore/build/EncoreCoreFFI.xcframework (static lib + C header + module map) and
 # ios/EncoreCore/Sources/EncoreCore/encore_ffi.swift (UniFFI bindings, committed).
 set -euo pipefail
@@ -13,6 +15,7 @@ cargo_profile=()
 for a in "$@"; do
   case "$a" in
     --sim) targets=(aarch64-apple-ios-sim) ;;
+    --device) targets=(aarch64-apple-ios) ;;
     --release) profile=release; cargo_profile=(--release) ;;
     *) echo "unknown option $a" >&2; exit 2 ;;
   esac

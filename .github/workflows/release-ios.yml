@@ -1,0 +1,310 @@
+# Builds the iPhone app (ios/Encore) for the App Store and uploads it to App Store Connect, where it
+# shows up in TestFlight once Apple has processed it (usually 5-30 minutes after the run).
+# Nothing is published on GitHub; the run summary names the version and build number uploaded.
+#
+# Start it by pushing a tag:  git tag ios-v1.0.4-15 && git push origin ios-v1.0.4-15
+# (ios-v<MARKETING_VERSION>-<CURRENT_PROJECT_VERSION>, both from ios/Encore/project.yml; the run
+# fails at once if they differ) or from the Actions tab (Release iOS > Run workflow): with a tag,
+# that tag is built; without one, the chosen branch is built with whatever project.yml says.
+# App Store Connect refuses a build number it has already seen: bump CURRENT_PROJECT_VERSION.
+#
+# Signing is Xcode's automatic signing driven by the App Store Connect API key
+# (-allowProvisioningUpdates -authenticationKey*): Xcode creates or fetches the certificates and
+# profiles it needs and uses the cloud-managed Apple Distribution certificate for the export, so
+# no certificate or profile is stored in the repo. That needs an Admin key (or App Manager with
+# access to Certificates, Identifiers & Profiles and to cloud-managed distribution certificates);
+# a Developer key can upload builds but cannot create distribution signing assets. docs/RELEASING.md
+# (iPhone section) has the setup and the fallback.
+#
+# Secrets (repository secrets):
+#   APPLE_API_KEY            base64 of the App Store Connect API key (.p8), shared with release-mac
+#   APPLE_API_KEY_ID         its Key ID
+#   APPLE_API_ISSUER_ID      its Issuer ID
+#   APPLE_IOS_API_KEY        optional: base64 of a separate .p8 for iOS signing (e.g. an Admin key,
+#   APPLE_IOS_API_KEY_ID       leaving the Mac's notarization key as it is); used when both are set
+# Variables (repository variables, not secret):
+#   APPLE_TEAM_ID            optional: the 10-character team ID. Without it the team is read from
+#                            App Store Connect (the bundle ID's App ID prefix).
+#
+# Not here on purpose: tests (unit, UI and E2E run locally; scripts in ios/Encore/scripts).
+name: Release iOS
+
+on:
+  push:
+    tags: ["ios-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build, e.g. ios-v1.0.4-15 (empty: the chosen branch as it is)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# One upload per tag at a time; never cancel a run that may be halfway through an upload.
+concurrency:
+  group: release-ios-${{ github.event_name == 'push' && github.ref_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  BUNDLE_ID: app.spotlessmusic.ios
+  PROJECT_DIR: ios/Encore
+
+jobs:
+  testflight:
+    # macOS 26 image with the newest stable Xcode (App Store uploads must use a current SDK; the
+    # project needs Swift 5.10+ and the iOS 17 SDK at the very least).
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+    steps:
+      - name: Paths
+        run: |
+          {
+            echo "ENCORE_CACHE=$RUNNER_TEMP/encore-cache"
+            echo "SPM_DIR=$RUNNER_TEMP/spm"
+            echo "ARCHIVE=$RUNNER_TEMP/Spotless.xcarchive"
+            echo "EXPORT_DIR=$RUNNER_TEMP/export"
+            echo "KEYS=$RUNNER_TEMP/keys"
+          } >> "$GITHUB_ENV"
+
+      # Before anything slow: a run without the key would only fail at the archive.
+      - name: Check secrets
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_IOS_API_KEY: ${{ secrets.APPLE_IOS_API_KEY }}
+          APPLE_IOS_API_KEY_ID: ${{ secrets.APPLE_IOS_API_KEY_ID }}
+        run: |
+          missing=0
+          for name in APPLE_API_ISSUER_ID; do
+            [ -n "${!name}" ] || { echo "::error::Repository secret $name is not set (docs/RELEASING.md)."; missing=1; }
+          done
+          if [ -n "$APPLE_IOS_API_KEY" ] && [ -n "$APPLE_IOS_API_KEY_ID" ]; then
+            echo "using the iOS key (APPLE_IOS_API_KEY_ID)"
+          elif [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_KEY_ID" ]; then
+            echo "using the shared key (APPLE_API_KEY_ID)"
+          else
+            echo "::error::No App Store Connect API key: set APPLE_API_KEY + APPLE_API_KEY_ID (or APPLE_IOS_API_KEY + APPLE_IOS_API_KEY_ID)."
+            missing=1
+          fi
+          exit "$missing"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Check out the tag (a dispatch may name one) and hold project.yml to it.
+      - name: Resolve tag and version
+        run: |
+          set -euo pipefail
+          if [ -n "$TAG" ]; then
+            if ! [[ "$TAG" =~ ^ios-v([0-9]+\.[0-9]+(\.[0-9]+)?)-([0-9]+)$ ]]; then
+              echo "::error::'$TAG' is not an iOS release tag (expected ios-v<version>-<build>, e.g. ios-v1.0.4-15)"; exit 1
+            fi
+            TAG_VERSION="${BASH_REMATCH[1]}"; TAG_BUILD="${BASH_REMATCH[3]}"
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG" \
+              || { echo "::error::tag $TAG does not exist on origin"; exit 1; }
+            git checkout --quiet "refs/tags/$TAG"
+          fi
+          yml="$PROJECT_DIR/project.yml"
+          VERSION="$(sed -n -E 's/^ *MARKETING_VERSION: *"?([^"]*)"? *$/\1/p' "$yml" | head -1)"
+          BUILD="$(sed -n -E 's/^ *CURRENT_PROJECT_VERSION: *"?([^"]*)"? *$/\1/p' "$yml" | head -1)"
+          echo "project.yml: version $VERSION build $BUILD${TAG:+  tag $TAG}"
+          [ -n "$VERSION" ] && [ -n "$BUILD" ] || { echo "::error::MARKETING_VERSION / CURRENT_PROJECT_VERSION not found in $yml"; exit 1; }
+          if [ -n "$TAG" ] && { [ "$VERSION" != "$TAG_VERSION" ] || [ "$BUILD" != "$TAG_BUILD" ]; }; then
+            echo "::error::Tag $TAG does not match $yml (MARKETING_VERSION $VERSION, CURRENT_PROJECT_VERSION $BUILD). Set them to $TAG_VERSION / $TAG_BUILD, commit, and tag that commit."
+            exit 1
+          fi
+          {
+            echo "VERSION=$VERSION"
+            echo "BUILD=$BUILD"
+          } >> "$GITHUB_ENV"
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # Key file for xcodebuild (and the team lookup), readable only by this user, removed in the
+      # cleanup step.
+      - name: Write API key
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_IOS_API_KEY: ${{ secrets.APPLE_IOS_API_KEY }}
+          APPLE_IOS_API_KEY_ID: ${{ secrets.APPLE_IOS_API_KEY_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "$APPLE_IOS_API_KEY" ] && [ -n "$APPLE_IOS_API_KEY_ID" ]; then
+            KEY="$APPLE_IOS_API_KEY"; KEY_ID="$APPLE_IOS_API_KEY_ID"
+          else
+            KEY="$APPLE_API_KEY"; KEY_ID="$APPLE_API_KEY_ID"
+          fi
+          mkdir -p "$KEYS"; chmod 700 "$KEYS"
+          P8="$KEYS/AuthKey_$KEY_ID.p8"
+          (umask 077; printf '%s' "$KEY" | base64 --decode > "$P8")
+          grep -q 'BEGIN PRIVATE KEY' "$P8" \
+            || { echo "::error::the API key secret does not decode to a .p8 private key (it must be the base64 of the AuthKey_XXXX.p8 file)"; exit 1; }
+          {
+            echo "ASC_KEY_PATH=$P8"
+            echo "ASC_KEY_ID=$KEY_ID"
+          } >> "$GITHUB_ENV"
+
+      # The repo variable if set, else the bundle ID's App ID prefix from App Store Connect.
+      - name: Team ID
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          ASC_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          TEAM_ID="$APPLE_TEAM_ID"; src="the APPLE_TEAM_ID variable"
+          if [ -z "$TEAM_ID" ]; then
+            TEAM_ID="$(ruby scripts/ci/asc-team-id.rb "$ASC_KEY_PATH" "$ASC_KEY_ID" "$ASC_ISSUER" "$BUNDLE_ID")" \
+              || { echo "::error::Could not read the team ID from App Store Connect; set the repository variable APPLE_TEAM_ID (Settings > Secrets and variables > Actions > Variables)."; exit 1; }
+            src="App Store Connect ($BUNDLE_ID)"
+          fi
+          [[ "$TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo "::error::team ID '$TEAM_ID' is not 10 upper-case letters/digits"; exit 1; }
+          echo "team ID from $src"
+          echo "TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
+
+      # A throwaway keychain, default for this job: automatic signing stores the private key of the
+      # Apple Development certificate it creates for the archive here, not in the runner's login
+      # keychain. Random password, deleted in the cleanup step.
+      - name: Signing keychain
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/spotless-ios.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -d user -s "$KEYCHAIN"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      # build-ios-core.sh builds into target/ios (its own CARGO_TARGET_DIR). Dependencies only.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-ios
+          workspaces: ". -> target/ios"
+          cache-on-failure: false
+
+      # The host build that generates the Swift bindings links encore-ffi as a dylib, which needs
+      # libmpv: the same pinned IINA set ci.yml uses (same cache key).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/encore-cache
+          key: libmpv-iina-arm64-${{ hashFiles('scripts/macos/fetch-libmpv.sh') }}
+
+      - name: libmpv (host, for the bindings build)
+        run: |
+          LIBDIR="$(scripts/macos/fetch-libmpv.sh --arch arm64 | tail -1)"
+          echo "LIBRARY_PATH=$LIBDIR" >> "$GITHUB_ENV"
+
+      # SwiftPM checkouts and binary artifacts (MPVKit's xcframeworks are large).
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/spm
+          key: spm-ios-${{ hashFiles('ios/Encore/Encore.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'ios/EncoreCore/Package.resolved', 'ios/EncoreCore/Package.swift', 'ios/Encore/project.yml') }}
+          restore-keys: spm-ios-
+
+      - name: Rust core for iOS (device, release)
+        run: scripts/build-ios-core.sh --release --device
+
+      # The public snapshot blanks the team ID in project.yml; put this team's back and regenerate.
+      - name: Generate the Xcode project
+        run: |
+          set -euo pipefail
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          sed -i '' -E "s/^( *DEVELOPMENT_TEAM: *)\"[A-Z0-9]*\"/\1\"$TEAM_ID\"/" "$PROJECT_DIR/project.yml"
+          grep -q "DEVELOPMENT_TEAM: \"$TEAM_ID\"" "$PROJECT_DIR/project.yml" \
+            || { echo "::error::could not set DEVELOPMENT_TEAM in project.yml"; exit 1; }
+          (cd "$PROJECT_DIR" && xcodegen generate)
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$PROJECT_DIR/Encore.xcodeproj" -scheme Encore \
+            -clonedSourcePackagesDirPath "$SPM_DIR"
+
+      # The full log goes to a file (kept as an artifact on failure); the job log shows errors and
+      # the signing lines.
+      - name: Archive
+        env:
+          ASC_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          LOG="$RUNNER_TEMP/archive.log"
+          status=0
+          xcodebuild archive \
+            -project "$PROJECT_DIR/Encore.xcodeproj" -scheme Encore -configuration Release \
+            -destination generic/platform=iOS -archivePath "$ARCHIVE" \
+            -clonedSourcePackagesDirPath "$SPM_DIR" -skipPackageUpdates \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER" \
+            DEVELOPMENT_TEAM="$TEAM_ID" > "$LOG" 2>&1 || status=$?
+          grep -E 'error:|Signing Identity|Provisioning Profile|\*\* ARCHIVE' "$LOG" | sort -u | head -100 || true
+          if [ "$status" -ne 0 ]; then
+            tail -60 "$LOG"
+            echo "::error::archive failed (full log in the ios-release-logs artifact)"; exit 1
+          fi
+          INFO="$ARCHIVE/Products/Applications/Encore.app/Info.plist"
+          got="$(plutil -extract CFBundleShortVersionString raw "$INFO") ($(plutil -extract CFBundleVersion raw "$INFO"))"
+          echo "archived $got"
+          [ "$got" = "$VERSION ($BUILD)" ] || { echo "::error::the archive says $got, expected $VERSION ($BUILD)"; exit 1; }
+
+      # destination=upload in the export options: this signs for distribution and uploads to App
+      # Store Connect in one go (no altool / Transporter step).
+      - name: Export and upload to App Store Connect
+        env:
+          ASC_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          OPTS="$RUNNER_TEMP/ExportOptions.plist"
+          cp "$PROJECT_DIR/ExportOptions.plist" "$OPTS"
+          plutil -replace teamID -string "$TEAM_ID" "$OPTS"
+          status=0
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" -exportOptionsPlist "$OPTS" -exportPath "$EXPORT_DIR" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER" \
+            > "$RUNNER_TEMP/export.log" 2>&1 || status=$?
+          cat "$RUNNER_TEMP/export.log"
+          [ "$status" -eq 0 ] || { echo "::error::export/upload failed (see above; a signing or permission error means the API key's role is too low, docs/RELEASING.md)"; exit 1; }
+          {
+            echo "### Spotless for iPhone $VERSION ($BUILD) uploaded to App Store Connect"
+            echo "Bundle \`$BUNDLE_ID\`${TAG:+, tag \`$TAG\`}. It appears in TestFlight once Apple has processed it."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "uploaded $VERSION build $BUILD"
+
+      - name: Keep the logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-logs
+          path: |
+            ${{ runner.temp }}/archive.log
+            ${{ runner.temp }}/export.log
+          if-no-files-found: ignore
+          retention-days: 5
+
+      - name: Clean up keychain and key
+        if: always()
+        run: |
+          # Fixed paths: the steps that set them may have failed before exporting anything.
+          KEYCHAIN="$RUNNER_TEMP/spotless-ios.keychain-db"
+          if [ -f "$KEYCHAIN" ]; then security delete-keychain "$KEYCHAIN" || true; fi
+          rm -rf "$RUNNER_TEMP/keys" "$RUNNER_TEMP/ExportOptions.plist"
+          echo "keychain and key file removed"
