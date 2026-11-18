@@ -17,6 +17,8 @@ import { playback, playSong } from '$lib/player.svelte';
 import { lib } from '$lib/library.svelte';
 import { artistPage, asSong } from '$lib/browse';
 import { toast } from '$lib/kit/toast';
+import { logUi } from '$lib/errlog';
+import { rawError } from '$lib/neterr';
 import { albumHref, artistHref, playlistHref, showHref } from '$lib/kit/actions';
 import { bookHref, genreHref, playBookById } from '$lib/audiobooks.svelte'; // stream: audiobooks
 
@@ -49,6 +51,12 @@ export async function toggle(key: string, start: () => Promise<void> | void, tit
 
 const CONTEXT_KINDS = new Set(['album', 'playlist', 'artist']);
 
+/** A card's play failed: the real error to the log (WARN) and on the toast. */
+export function playFailed(e: unknown, what: { kind: string; id: string }) {
+	logUi('warn', `play ${what.kind} ${what.id} failed: ${rawError(e)}`);
+	toast.fail(e, "Couldn't play this", { detail: true });
+}
+
 /** Play `songs` as a context (Recents + Home learn it). */
 export async function playContext(
 	key: string,
@@ -57,7 +65,8 @@ export async function playContext(
 	opts: { start?: number | null; sourceId?: string; shuffle?: boolean; continuation?: string } = {}
 ) {
 	if (!songs.length) {
-		toast.error("Couldn't play this right now");
+		logUi('warn', `play ${ctx.kind} ${ctx.id}: nothing to play`);
+		toast.error('There’s nothing to play here.');
 		return;
 	}
 	if (CONTEXT_KINDS.has(ctx.kind))
@@ -119,11 +128,23 @@ export async function playBrowse(item: BrowseItem | ExploreItem, shuffle = false
 				await playEpisodes(item.id, s.show.title, (eps.length ? eps : s.episodes).slice(0, 1), s.show.thumbnail);
 				return;
 			}
+			case 'episode': {
+				// The show is the context, as for an episode on Home.
+				const e = await api.podcastEpisode(item.id);
+				started[item.id] = { sourceName: e.showTitle };
+				await api.playPlaylistFrom([episodeSong(e)], 0, {
+					kind: 'podcast',
+					id: e.showId ?? `ep:${e.id}`,
+					title: e.showTitle,
+					thumbnail: e.thumbnail ?? undefined
+				});
+				return;
+			}
 			default:
 				openExplore(item);
 		}
-	} catch {
-		toast.error("Couldn't play this right now");
+	} catch (e) {
+		playFailed(e, item);
 	}
 }
 
@@ -290,7 +311,7 @@ export async function playShelfItem(item: ShelfItem, shuffle = false): Promise<v
 			}
 		}
 	} catch (e) {
-		toast.error("Couldn't play this right now");
+		playFailed(e, item);
 	}
 }
 

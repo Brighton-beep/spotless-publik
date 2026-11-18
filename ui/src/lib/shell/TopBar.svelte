@@ -246,7 +246,10 @@
 					? { kind: 'show', item: { kind: 'podcast', id: d.show.id, title: d.show.title, subtitle: d.show.author, thumbnail: d.show.thumbnail ?? undefined } }
 					: d.item.kind === 'song'
 						? { kind: 'song', song: asSong(d.item) }
-						: { kind: 'card', item: d.item }
+						: // A show or episode as the Top result opens its own page (`openExplore`), not a playlist's.
+							(d.item.kind as string) === 'podcast' || (d.item.kind as string) === 'episode'
+							? { kind: 'show', item: d.item }
+							: { kind: 'card', item: d.item }
 		)
 	);
 	const queryRows = $derived.by<Row[]>(() => {

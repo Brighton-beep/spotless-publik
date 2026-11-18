@@ -24,9 +24,9 @@ use super::metadata::{
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowseItem {
-    /// `song` | `playlist` | `album` | `artist`.
+    /// `song` | `playlist` | `album` | `artist` | `podcast` (show `MPSP…`) | `episode`.
     pub kind: &'static str,
-    /// videoId (song) or browseId (playlist/album/artist).
+    /// videoId (song, episode) or browseId (playlist/album/artist/podcast).
     pub id: String,
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -709,9 +709,9 @@ fn bucket_item(li: &Value, r: &mut SearchResults) {
     match bi.kind {
         "album" => r.albums.push(bi),
         "artist" => r.artists.push(bi),
-        // A podcast show is a `playlist` card with an `MPSP…` id. It belongs in the Podcasts
-        // shelf (podcast search), never among playlists ("Featuring <artist>").
-        "playlist" if bi.id.starts_with("MPSP") => {}
+        // Shows and episodes belong in the Podcasts and Episodes shelves (podcast search), never
+        // among playlists ("Featuring <artist>") or songs. Only the Top result keeps one.
+        "podcast" | "episode" => {}
         "playlist" => r.playlists.push(bi),
         _ => r.songs.push(bi),
     }
@@ -1268,13 +1268,19 @@ fn parse_two_row_item(node: &Value) -> Option<BrowseItem> {
     })
 }
 
-/// Classify a browseId: albums are `MPRE…`, artist/user channels are `UC…`, everything else
-/// (`VL…`, `PL…`, `RD…`) is treated as a playlist. context/08.
+/// Classify a browseId: albums are `MPRE…`, artist/user channels are `UC…`, podcast shows
+/// `MPSP…`, podcast episodes `MPED…`; everything else (`VL…`, `PL…`, `RD…`) is a playlist.
+/// context/08. A show or an episode called a playlist opens as an empty playlist page and plays
+/// nothing (1.0.4-rc.3, an episode as search's Top result).
 fn browse_kind_from_id(id: &str) -> &'static str {
     if id.starts_with("MPRE") || id.starts_with("VLMPRE") {
         "album"
     } else if id.starts_with("UC") {
         "artist"
+    } else if id.starts_with("MPSP") {
+        "podcast"
+    } else if id.starts_with("MPED") {
+        "episode"
     } else {
         "playlist"
     }
@@ -1283,9 +1289,14 @@ fn browse_kind_from_id(id: &str) -> &'static str {
 /// A browseId as the UI should store it: kind plus the id to navigate with. Library-artist rows
 /// link `MPLA` + the channelId (the "artist, filtered to your library" page); strip the prefix so
 /// they open the normal artist page like every other artist card. context/08.
+///
+/// An episode's page is `MPED` + its videoId; the card carries the bare videoId, the id every
+/// episode has everywhere else (the episode page, the player, chapters, Your Episodes).
 fn browse_target(id: &str) -> (&'static str, String) {
     let id = id.strip_prefix("MPLA").unwrap_or(id);
-    (browse_kind_from_id(id), id.to_owned())
+    let kind = browse_kind_from_id(id);
+    let id = if kind == "episode" { &id[4..] } else { id };
+    (kind, id.to_owned())
 }
 
 /// A podcast opened by its playlist id (`VLPL…`, e.g. from a pasted `playlist?list=` link) lists
@@ -2248,6 +2259,38 @@ mod tests {
         let r = parse_search_all(&root);
         assert_eq!(r.playlists.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["VLPLmix"]);
         assert!(r.songs.iter().all(|s| !s.id.starts_with("MPSP")));
+    }
+
+    /// 1.0.4-rc.3: "jensen huang jre" answers with the episode `MPED3hptKYix4X8` as the Top
+    /// result. It was typed `playlist`, so it opened as an empty playlist and played nothing.
+    #[test]
+    fn search_all_types_episodes_and_shows() {
+        let row = |id: &str, title: &str| json!({ "itemSectionRenderer": { "contents": [
+            { "musicResponsiveListItemRenderer": {
+                "navigationEndpoint": { "browseEndpoint": { "browseId": id } },
+                "flexColumns": [
+                    { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": title }] } } }
+                ]
+            } }
+        ] } });
+        let root = json!({ "contents": { "tabbedSearchResultsRenderer": { "tabs": [{ "tabRenderer": { "content": {
+            "sectionListRenderer": { "contents": [
+                { "musicCardShelfRenderer": {
+                    "title": { "runs": [{ "text": "Joe Rogan Experience #2422 - Jensen Huang",
+                        "navigationEndpoint": { "browseEndpoint": { "browseId": "MPED3hptKYix4X8" } } }] },
+                    "subtitle": { "runs": [{ "text": "Episode" }, { "text": " • " }, { "text": "The Joe Rogan Experience" }] }
+                } },
+                row("MPEDother", "Another episode"),
+                row("MPSPPLshow", "The Joe Rogan Experience"),
+                row("VLPLmix", "Jensen memes")
+            ] }
+        } } }] } } });
+        let r = parse_search_all(&root);
+        let top = &r.top[0];
+        assert_eq!((top.kind, top.id.as_str()), ("episode", "3hptKYix4X8"));
+        assert_eq!(r.playlists.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["VLPLmix"]);
+        assert!(r.songs.is_empty(), "episodes and shows are not songs: {:?}", r.songs);
+        assert_eq!(browse_target("MPSPPLshow").0, "podcast");
     }
 
     #[test]

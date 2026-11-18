@@ -70,7 +70,8 @@ struct SongItem: Codable, Hashable, Identifiable {
     }
 }
 
-/// `podcast` (show `MPSP…`) and `episode` (`MPED…`) come from explore surfaces (api.ts `ExploreItem`).
+/// `podcast` (show `MPSP…`) and `episode` (its videoId) come from explore surfaces and search's Top
+/// result (api.ts `ExploreItem`); `Router.open` takes them to the show and episode pages.
 enum BrowseKind: String, Codable, Hashable { case song, playlist, album, artist, podcast, episode, audiobook }
 
 struct BrowseItem: Codable, Hashable, Identifiable {

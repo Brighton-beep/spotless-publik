@@ -247,8 +247,10 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
           spctl --assess --type execute --verbose=2 "$APP"
           spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
-          xcrun stapler validate "$DMG"
-          xcrun stapler validate "$APP"
+          # These ask Apple's servers; a dropped connection (error 68) is retried, not a failed release.
+          validate() { for i in 1 2 3 4 5; do xcrun stapler validate "$1" && return 0; echo "stapler validate failed (attempt $i), retrying"; sleep $((i * 10)); done; return 1; }
+          validate "$DMG"
+          validate "$APP"
           lipo -archs "$APP/Contents/MacOS/$(plutil -extract CFBundleExecutable raw "$APP/Contents/Info.plist")"
           python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["version"]==sys.argv[2], d["version"]; print("latest.json:", d["version"], sorted(d["platforms"]))' "$OUT/latest.json" "$VERSION"
 

@@ -190,6 +190,9 @@ pub async fn podcast_show_more(
 /// One episode with full show notes (the episode page).
 pub async fn podcast_episode(state: &Arc<AppState>, id: String) -> Result<Episode, String> {
     let st = state.clone();
+    // A YouTube episode is stored by its videoId; search and explore cards carry its page's
+    // browseId (`MPED<videoId>`).
+    let id = id.strip_prefix("MPED").map(str::to_owned).unwrap_or(id);
     if !super::is_rss_id(&id) {
         let mut e = youtube::fetch_episode(&st.it, client(&st)?, &id).await?;
         let conn = st.db.podcasts_conn();

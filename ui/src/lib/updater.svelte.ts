@@ -27,7 +27,10 @@ export const updateState = $state({
 	available: null as { version: string; rollback: boolean } | null,
 	canInstall: true, // always resolved before `available` is set
 	checking: false, // Settings "Check for updates" is in flight
-	installing: false // downloading/installing the update
+	installing: false, // downloading/installing the update
+	// The last "Check for updates" outcome (Settings › About, Spotless › Check for Updates…),
+	// shown inline under the row. `available` puts Install beside it.
+	result: null as { message: string; error: boolean; available: boolean } | null
 });
 
 // The resolved handle to download; kept out of reactive state (it's not serializable/renderable).
@@ -69,17 +72,22 @@ export async function checkForUpdatesQuiet() {
 	}
 }
 
-/** From Settings: return the outcome so the modal can show it inline (a toast renders behind the
- *  dialog). `error` picks the Alert variant. */
-export async function checkForUpdatesInteractive(): Promise<{ message: string; error: boolean }> {
-	if (!UPDATER_ENABLED) return { message: 'Automatic updates are not available yet.', error: false };
+/** Settings › About's "Check for updates" and the app menu's "Check for Updates…": always reports,
+ *  into `updateState.result` (and returns it). */
+export async function checkForUpdatesInteractive(): Promise<{ message: string; error: boolean; available: boolean }> {
+	if (!UPDATER_ENABLED)
+		return (updateState.result = { message: 'Automatic updates are not available yet.', error: false, available: false });
+	if (updateState.checking) return updateState.result ?? { message: '', error: false, available: false };
 	updateState.checking = true;
+	updateState.result = null;
 	try {
-		if (await look()) return { message: availableMessage(updateState.available!), error: false };
-		return { message: t('settings.about.up_to_date'), error: false };
+		if (await look())
+			return (updateState.result = { message: availableMessage(updateState.available!), error: false, available: true });
+		return (updateState.result = { message: t('settings.about.up_to_date'), error: false, available: false });
 	} catch (e) {
+		console.warn('update check failed', e);
 		const detail = friendlyNetError(String(e), t('errors.unreachable'));
-		return { message: t('settings.about.update_check_failed', { error: detail }), error: true };
+		return (updateState.result = { message: t('settings.about.update_check_failed', { error: detail }), error: true, available: false });
 	} finally {
 		updateState.checking = false;
 	}

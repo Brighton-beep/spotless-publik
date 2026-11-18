@@ -28,6 +28,7 @@ use crate::state::AppState;
 /// Every item that is forwarded to the page as `menu://<id>`, with its accelerator (for the
 /// report and the shortcuts overlay). Keep in sync with [`build`].
 pub const UI_EVENTS: &[(&str, &str)] = &[
+    ("check-updates", ""),
     ("preferences", "Cmd+,"),
     ("new-playlist", "Cmd+N"),
     ("new-folder", "Alt+Cmd+N"),
@@ -85,6 +86,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     let app_menu = SubmenuBuilder::new(app, "Spotless")
         .item(&about)
+        .item(&item(app, "check-updates", "Check for Updates…", None)?)
         .item(&sep()?)
         .item(&item(app, "preferences", "Settings…", Some("Cmd+,"))?)
         .item(&sep()?)
@@ -291,6 +293,12 @@ mod tests {
     #[test]
     fn offline_mode_is_handled_natively() {
         assert!(UI_EVENTS.iter().all(|(id, _)| *id != super::OFFLINE_MODE));
+    }
+
+    /// Spotless › Check for Updates… is the page's (Settings › About shows the outcome).
+    #[test]
+    fn check_for_updates_reaches_the_page() {
+        assert!(UI_EVENTS.iter().any(|(id, _)| *id == "check-updates"));
     }
 
     #[test]

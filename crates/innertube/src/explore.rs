@@ -278,10 +278,7 @@ fn rank_of(row: &Value) -> (Option<u32>, Option<&'static str>) {
 
 fn chart_entry(node: &Value) -> Option<ChartEntry> {
     if let Some(row) = node.get("musicResponsiveListItemRenderer") {
-        let mut item = list_item_to_browse_item(row)?;
-        if item.id.starts_with("MPSP") {
-            item.kind = "podcast";
-        }
+        let item = list_item_to_browse_item(row)?;
         let (rank, trend) = rank_of(row);
         return Some(ChartEntry { item, rank, trend });
     }
@@ -350,20 +347,8 @@ fn page_title(root: &Value) -> Option<String> {
     find_all(header, "musicHeaderRenderer").into_iter().find_map(|h| runs_text(h.get("title")))
 }
 
-/// `parse_two_row_item` files podcast shows and episodes under `playlist`; name them.
-fn kind_podcasts(sections: &mut [Section]) {
-    for i in sections.iter_mut().flat_map(|s| s.items.iter_mut()) {
-        if i.id.starts_with("MPED") {
-            i.kind = "episode";
-        } else if i.id.starts_with("MPSP") {
-            i.kind = "podcast";
-        }
-    }
-}
-
 pub fn parse_sections_page(root: &Value) -> SectionsPage {
-    let mut sections = parse_home(root).sections;
-    kind_podcasts(&mut sections);
+    let sections = parse_home(root).sections;
     SectionsPage { title: page_title(root), sections }
 }
 
@@ -374,7 +359,6 @@ pub fn parse_new_releases(root: &Value) -> NewReleasesPage {
         .flatten()
         .find_map(parse_carousel_item);
     let mut sections = parse_home(root).sections;
-    kind_podcasts(&mut sections);
     for s in &mut sections {
         s.kind = match s.more_browse_id.as_deref() {
             Some("FEmusic_new_releases_albums") => Some("albums"),

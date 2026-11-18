@@ -16,7 +16,7 @@
 	const key = $derived(item.kind === 'song' ? `song:${item.id}` : item.id);
 	const playing = $derived(isPlaying(key));
 	const kindLabel = $derived(
-		({ song: 'Song', artist: 'Artist', album: 'Album', playlist: 'Playlist', podcast: 'Podcast' } as Record<string, string>)[item.kind] ?? ''
+		({ song: 'Song', artist: 'Artist', album: 'Album', playlist: 'Playlist', podcast: 'Podcast', episode: 'Episode' } as Record<string, string>)[item.kind] ?? ''
 	);
 	const type = $derived(
 		item.kind === 'artist' ? kindLabel : [kindLabel, creatorOf(item.subtitle)].filter(Boolean).join(' • ')

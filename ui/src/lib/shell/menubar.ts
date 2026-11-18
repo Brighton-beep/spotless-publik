@@ -10,8 +10,15 @@ import { focusSearch } from './search.svelte';
 import { openSettings } from './settings';
 import { toggleLeft, toggleRight } from './layout.svelte';
 import { requestFind } from './find.svelte';
+import { goSettings } from '$lib/settings/actions';
+import { checkForUpdatesInteractive } from '$lib/updater.svelte';
 
 export const MENU_ACTIONS: Record<string, () => void> = {
+	// Settings › About's row shows the outcome (and Install), as a Mac app's About/Updates pane would.
+	'check-updates': () => {
+		goSettings('updates');
+		void checkForUpdatesInteractive();
+	},
 	preferences: openSettings,
 	'new-playlist': () => createPlaylist(),
 	'new-folder': () => createFolder(),

@@ -44,6 +44,7 @@
 	import { toast } from '$lib/kit/toast';
 	import { confirmDialog } from '$lib/kit/confirm.svelte';
 	import Row from '$lib/settings/Row.svelte';
+	import { checkForUpdatesInteractive, installUpdate, openDownloadPage, updateState } from '$lib/updater.svelte';
 	import RecoverPlaylists from '$lib/settings/RecoverPlaylists.svelte'; // stream: magic-d4
 	import Switch from '$lib/settings/Switch.svelte';
 	import Select from '$lib/settings/Select.svelte';
@@ -809,8 +810,31 @@
 		<!-- About -->
 		<section data-settings-section>
 			{@render section('about', 'About')}
-			<Row label="Spotless version">
-				{#snippet control()}<span class="text-sm text-white tabular-nums">{version || '…'}</span>{/snippet}
+			<!-- Also run by Spotless › Check for Updates… (menu://check-updates), which lands here. -->
+			<Row id="updates" label="Check for updates" hint={`Version ${version || '…'}`}>
+				{#if updateState.result}
+					<div
+						class="mt-1 text-sm {updateState.result.error ? 'text-text-negative' : 'text-white'}"
+						role="status"
+						data-testid="update-result"
+					>
+						{updateState.result.message}
+					</div>
+				{/if}
+				{#snippet control()}
+					{#if updateState.result?.available && updateState.available}
+						{#if updateState.canInstall}
+							<Pill variant="white" onclick={installUpdate} disabled={updateState.installing}>
+								{updateState.installing ? 'Installing…' : 'Install'}
+							</Pill>
+						{:else}
+							<Pill variant="white" onclick={openDownloadPage}>Download</Pill>
+						{/if}
+					{/if}
+					<Pill variant="outline" onclick={() => checkForUpdatesInteractive()} disabled={updateState.checking || updateState.installing}>
+						{updateState.checking ? 'Checking…' : 'Check for updates'}
+					</Pill>
+				{/snippet}
 			</Row>
 			<Row label="Spotless is free software under the GNU General Public License v3.0 or later. Audio comes from YouTube; no ads, no account.">
 				{#snippet control()}

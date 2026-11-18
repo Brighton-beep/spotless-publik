@@ -326,7 +326,8 @@ export interface ArtistCarousel {
 	moreParams?: string;
 }
 export interface SearchResults {
-	top: BrowseItem[];
+	/** The Top result can also be a podcast show or episode. */
+	top: (BrowseItem | ExploreItem)[];
 	songs: BrowseItem[];
 	albums: BrowseItem[];
 	artists: BrowseItem[];
@@ -1801,7 +1802,7 @@ export const onSleepTimer = (cb: (s: SleepState) => void): Promise<UnlistenFn> =
 // health and the podcast RSS→YouTube switch. See docs/streams/polish.md.
 
 /** A card on an explore surface: a `BrowseItem`, plus podcast kinds (`podcast` = show `MPSP…`,
- *  `episode` = `MPED…`) that `get_browse_sections` / charts can carry. */
+ *  `episode` = its videoId) that `get_browse_sections` / charts / search's Top result can carry. */
 export type ExploreItem = Omit<BrowseItem, 'kind'> & {
 	kind: BrowseItem['kind'] | 'podcast' | 'episode';
 	isVideo?: boolean;
@@ -2117,7 +2118,7 @@ export const localUserName = () => invoke<string | null>('local_user_name');
  *  `top[0]`, `artist` = its `artists[0]`. `null` keeps YouTube's. Pure, local. */
 export const podcastTopShow = (
 	query: string,
-	top: BrowseItem | null,
+	top: BrowseItem | ExploreItem | null,
 	artist: BrowseItem | null,
 	shows: PodcastShow[]
 ) => invoke<number | null>('podcast_top_show', { query, top, artist, shows });

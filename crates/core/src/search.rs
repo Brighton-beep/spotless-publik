@@ -1131,8 +1131,8 @@ async fn page_once(
             let p = it.search_cards_page(c, q, f, continuation).await.map_err(err)?;
             let mut items = p.items;
             if f == SearchFilter::Playlists {
-                // Shows have their own chip.
-                items.retain(|i| !i.id.starts_with("MPSP"));
+                // Shows and episodes have their own chips.
+                items.retain(|i| i.kind == "playlist");
             }
             Ok(SearchPage { items, continuation: p.continuation, correction: fix_of(p.spell_fix), ..Default::default() })
         }
@@ -1499,6 +1499,63 @@ mod live {
                 }
             }
             tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// What the UIs do with a search card of this kind: (play, open). Mirrors `playBrowse` /
+    /// `exploreHref` (Mac) and `SearchView.swift` (iPhone).
+    fn ui_action(kind: &str, id: &str) -> String {
+        match kind {
+            "song" => format!("play video {id}; open = play"),
+            "album" => format!("play album {id}; open /album/{id}"),
+            "artist" => format!("play top songs; open /artist/{id}"),
+            "playlist" => format!("play getPlaylist({id}); open /playlist/{id}"),
+            "podcast" => format!("play newest episode of {id}; open /show/{id}"),
+            "episode" => format!("play episode {id}; open /episode/{id}"),
+            _ => "nothing".into(),
+        }
+    }
+
+    /// The owner's report (1.0.4-rc.3): an episode from "jensen huang jre" opened as an empty
+    /// playlist and wouldn't play. Prints every result's kind, id and what the UIs do with it:
+    /// `cargo test -p encore-core --lib search::live::episode_results_route_as_episodes -- --ignored --nocapture`.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "hits live YouTube Music and iTunes"]
+    async fn episode_results_route_as_episodes() {
+        let dir = std::env::temp_dir().join(format!("spotless-search-ep-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let host: Arc<dyn crate::host::Host> = Arc::new(crate::host::NullHost(dir.clone()));
+        let st = crate::boot::start_core(host).map_err(|e| e.to_string()).unwrap().state.clone();
+        let ov = search_overview(&st, "jensen huang jre".into(), false).await.unwrap();
+        let r = &ov.results;
+        let mut cards = Vec::new();
+        for (shelf, list) in [("top", &r.top), ("songs", &r.songs), ("albums", &r.albums), ("artists", &r.artists), ("playlists", &r.playlists)] {
+            for c in list {
+                println!("{shelf:>9}: {:<8} {:<40} {:?} -> {}", c.kind, c.id, c.title, ui_action(c.kind, &c.id));
+                cards.push(c);
+            }
+        }
+        for s in &ov.shows {
+            println!("{:>9}: show     {:<40} {:?} -> open /show/{}", "shows", s.id, s.title, s.id);
+        }
+        for e in &ov.episodes {
+            println!("{:>9}: episode  {:<40} {:?} (video {:?})", "episodes", e.id, e.title, e.video_id);
+        }
+        for c in &cards {
+            if c.id.starts_with("MPSP") {
+                assert_eq!(c.kind, "podcast", "{} is a show", c.id);
+            }
+            assert!(c.kind != "playlist" || !c.id.starts_with("MP"), "{} ({}) routed as a playlist", c.id, c.title);
+        }
+        // The owner's episode is the Top result, as an episode.
+        let top = r.top.first().expect("a Top result");
+        assert_eq!((top.kind, top.id.as_str()), ("episode", "3hptKYix4X8"), "{}", top.title);
+        // The episode page and its play button both load the episode by the card's id.
+        for c in cards.iter().filter(|c| c.kind == "episode") {
+            let e = podcasts::api::podcast_episode(&st, c.id.clone()).await.unwrap();
+            println!("episode page for {}: {:?} of {:?}, video {:?}", c.id, e.title, e.show_title, e.video_id);
+            assert_eq!(e.id, c.id);
         }
         let _ = std::fs::remove_dir_all(&dir);
     }

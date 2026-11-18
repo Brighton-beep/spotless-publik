@@ -18,6 +18,9 @@ export type ToastOpts = {
 	secondary?: ToastAction;
 	/** ms; default 3000, 6000 when there is an action. */
 	duration?: number;
+	/** `fail` only: when the error fits no friendly wording, show it after `context` ("Couldn't play
+	 *  this: <the error>") instead of "… Try again.". */
+	detail?: boolean;
 };
 
 // The sentences, translatable: the app swaps in its locale's words at startup.
@@ -63,7 +66,11 @@ function show(kind: 'info' | 'success' | 'error', msg: string, opts: ToastOpts =
  *  text to the log. */
 function fail(e: unknown, context?: string, opts?: ToastOpts) {
 	const raw = rawError(e);
-	const shown = friendlyError(raw, context, words());
+	let shown = friendlyError(raw, context, words());
+	const what = context?.trim().replace(/[.!]$/, '');
+	// The fallback sentence says nothing about why; the error itself does.
+	if (opts?.detail && what && shown === `${what}. Try again.`)
+		shown = `${what}: ${raw.replace(/^Error: /, '').slice(0, 200)}`;
 	logRaw(raw, shown);
 	sonner.dismiss();
 	return sonner(shown, {
