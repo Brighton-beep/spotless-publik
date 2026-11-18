@@ -41,7 +41,7 @@ final class MagicIDRuleTests: XCTestCase {
 
     /// #23: commit at a third of the row (96 pt at least); past it the row moves at 30 %.
     func testRowSwipeThresholdAndRubberBand() {
-        XCTAssertEqual(RowSwipe.threshold(width: 402), 134)
+        XCTAssertEqual(RowSwipe.threshold(width: 402), 150.75)
         XCTAssertEqual(RowSwipe.threshold(width: 200), 96)
         XCTAssertEqual(RowSwipe.damped(50, threshold: 134), 50)
         XCTAssertEqual(RowSwipe.damped(-50, threshold: 134), -50)

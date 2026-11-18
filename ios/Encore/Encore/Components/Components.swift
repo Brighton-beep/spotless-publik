@@ -230,10 +230,12 @@ struct RowSwipe: ViewModifier {
     @State private var armed = false
     @State private var axis: Axis?
     @State private var rowWidth: CGFloat = 402
-    /// Commit point: about a third of the row (spec, entity-pages.md › swipe).
+    /// Commit point: a bit over a third of the row, as in Spotify.
     private var threshold: CGFloat { Self.threshold(width: rowWidth) }
+    /// 0 at rest, 1 at the threshold: the glyph grows with it.
+    private var progress: CGFloat { min(1, abs(dx) / threshold) }
 
-    static func threshold(width: CGFloat) -> CGFloat { max(96, width / 3) }
+    static func threshold(width: CGFloat) -> CGFloat { max(96, width * 0.375) }
     /// Past the threshold the row moves at 30 % of the finger (rubber band).
     static func damped(_ x: CGFloat, threshold: CGFloat) -> CGFloat {
         let m = abs(x)
@@ -243,22 +245,19 @@ struct RowSwipe: ViewModifier {
 
     func body(content: Content) -> some View {
         if enabled {
-            ZStack {
-                // Revealed under the row while swiping: queue on the left, like on the right.
+            let row = ZStack {
+                // Revealed under the row while swiping: queue on the left, like on the right. The
+                // strip fills in with the accent and the glyph grows as the drag nears the commit point.
+                let glyph = Icon(name: dx > 0 ? "queue" : liked ? "check-circle" : "plus-circle",
+                                 fill: dx <= 0 && liked, size: 24)
+                    .scaleEffect(armed ? 1.15 : 0.6 + 0.4 * progress)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: armed)
                 HStack {
-                    if dx > 0 {
-                        Icon(name: "queue", size: 24).padding(.leading, 24)
-                        Spacer()
-                    } else {
-                        Spacer()
-                        Icon(name: liked ? "check-circle" : "plus-circle", fill: liked, size: 24).padding(.trailing, 24)
-                    }
+                    if dx > 0 { glyph.padding(.leading, 24); Spacer() } else { Spacer(); glyph.padding(.trailing, 24) }
                 }
-                .foregroundStyle(Color.black)
-                .scaleEffect(armed ? 1.15 : 1)
-                .animation(.spring(response: 0.25, dampingFraction: 0.6), value: armed)
+                .foregroundStyle(armed ? Color.black : Palette.text)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Palette.accent)
+                .background(armed ? Palette.accent : Palette.accent.opacity(0.25 + 0.35 * progress))
                 .opacity(abs(dx) > 4 ? 1 : 0)
                 .accessibilityHidden(true)
 
@@ -268,29 +267,84 @@ struct RowSwipe: ViewModifier {
             }
             .clipped()
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
-            .simultaneousGesture(swipe)
+            if #available(iOS 18.0, *) {
+                // A UIKit pan that only begins on a sideways drag: vertical drags fail it at once and
+                // go to the scroll view; a SwiftUI DragGesture lost real finger swipes to the scroll view.
+                row.gesture(RowPan(changed: changed, ended: ended))
+            } else {
+                row.simultaneousGesture(swipe)
+            }
         } else {
             content
         }
     }
 
+    private func changed(_ tx: CGFloat) {
+        dx = Self.damped(tx, threshold: threshold)
+        let now = abs(tx) >= threshold
+        if now != armed { armed = now; Haptics.impact(.light) }
+    }
+
+    /// Release: past the threshold runs the action, otherwise (or cancelled) it just springs back.
+    private func ended(cancelled: Bool) {
+        if armed && !cancelled {
+            if dx > 0 { queue() } else { like() }
+        }
+        armed = false
+        withAnimation(Motion.spring) { dx = 0 }
+    }
+
+    /// iOS 17 fallback.
     private var swipe: some Gesture {
         DragGesture(minimumDistance: 14)
             .onChanged { v in
                 if axis == nil { axis = abs(v.translation.width) > abs(v.translation.height) ? .horizontal : .vertical }
                 guard axis == .horizontal else { return }
-                dx = Self.damped(v.translation.width, threshold: threshold)
-                let now = abs(v.translation.width) >= threshold
-                if now != armed { armed = now; Haptics.impact(.light) }
+                changed(v.translation.width)
             }
             .onEnded { _ in
-                if axis == .horizontal && armed {
-                    if dx > 0 { queue() } else { like() }
-                }
+                ended(cancelled: axis != .horizontal)
                 axis = nil
-                armed = false
-                withAnimation(Motion.spring) { dx = 0 }
             }
+    }
+}
+
+/// The row swipe's pan: begins only when the drag is mostly sideways (and not from the screen's
+/// left edge, which goes back), and the scroll view's own pan waits for it to fail.
+@available(iOS 18.0, *)
+struct RowPan: UIGestureRecognizerRepresentable {
+    var changed: (CGFloat) -> Void
+    var ended: (_ cancelled: Bool) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let g = UIPanGestureRecognizer()
+        g.delegate = context.coordinator
+        return g
+    }
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func handleUIGestureRecognizerAction(_ g: UIPanGestureRecognizer, context: Context) {
+        switch g.state {
+        case .began, .changed: changed(g.translation(in: g.view).x)
+        case .ended: ended(false)
+        case .cancelled, .failed: ended(true)
+        default: break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+            guard let p = g as? UIPanGestureRecognizer else { return true }
+            if let w = p.view?.window, p.location(in: w).x < 24 { return false }
+            let v = p.velocity(in: p.view), t = p.translation(in: p.view)
+            let x = abs(v.x) + abs(v.y) > 1 ? v : CGPoint(x: t.x, y: t.y)
+            return abs(x.x) > abs(x.y) * 1.2
+        }
+
+        func gestureRecognizer(_ g: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            other.view is UIScrollView && other is UIPanGestureRecognizer
+        }
     }
 }
 

@@ -40,6 +40,39 @@ final class MagicIDFlowTests: XCTestCase {
         XCTAssertTrue(toastSays("Liked Songs"), "swipe left on a search result saves it")
     }
 
+    /// A finger-like swipe (no press first, straight into the drag) past the threshold queues, as
+    /// on a real phone; a short one springs back and does nothing.
+    func testSwipeToQueueLikeAFinger() {
+        let r = row("Aerodynamic")
+        XCTAssertTrue(r.waitForExistence(timeout: 8))
+        let w = app.frame.width  // the row spans the screen
+        // Short: ~20 % of the row, released before the threshold.
+        let s = r.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5))
+        s.press(forDuration: 0, thenDragTo: s.withOffset(CGVector(dx: w * 0.2, dy: 0)), withVelocity: .slow, thenHoldForDuration: 0)
+        XCTAssertFalse(toast.waitForExistence(timeout: 1.5), "a short swipe cancels")
+        sleep(1)
+        s.press(forDuration: 0, thenDragTo: s.withOffset(CGVector(dx: w * 0.55, dy: 4)), withVelocity: .default, thenHoldForDuration: 0)
+        XCTAssertTrue(toastSays("Added to queue"), "a full swipe right queues the song")
+        add({ let a = XCTAttachment(screenshot: app.screenshot()); a.name = "swipe-queue-toast"; a.lifetime = .keepAlways; return a }())
+        // A quick flick works too.
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: toast)
+        waitForExpectations(timeout: 8)
+        s.press(forDuration: 0, thenDragTo: s.withOffset(CGVector(dx: w * 0.6, dy: -6)), withVelocity: .fast, thenHoldForDuration: 0)
+        XCTAssertTrue(toastSays("Added to queue"), "a flick right queues the song")
+    }
+
+    /// A slightly slanted vertical drag on a song row still scrolls the list and queues nothing.
+    func testVerticalDragOnRowScrolls() {
+        let r = row("Voyager")
+        XCTAssertTrue(r.waitForExistence(timeout: 8))
+        let y = r.frame.minY
+        let s = r.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        s.press(forDuration: 0, thenDragTo: s.withOffset(CGVector(dx: 30, dy: -200)), withVelocity: .default, thenHoldForDuration: 0.3)
+        XCTAssertFalse(toast.waitForExistence(timeout: 1.5), "a vertical drag doesn't queue")
+        XCTAssertLessThan(r.frame.minY, y - 100, "a vertical drag on a row scrolls the results")
+    }
+
     /// #23: artists, albums and playlists don't swipe (a short drag leaves no toast).
     func testNonSongResultDoesNotSwipe() {
         let artist = app.descendants(matching: .any)

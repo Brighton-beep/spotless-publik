@@ -626,8 +626,8 @@ struct ResultRow: View {
         .padding(.horizontal, Space.gutter)
         .frame(height: Metrics.rowHeight)
         .opacity(block != nil ? 0.4 : 1)
-        // Song results (not recents) swipe: right adds to the queue, left saves (search.md).
-        .rowSwipe(enabled: song != nil && !trailingClear, liked: liked,
+        // Song rows swipe, results and recent searches alike: right adds to the queue, left saves.
+        .rowSwipe(enabled: song != nil, liked: liked,
                   queue: { if let song { app.queue([song]) } }, like: { if let song { app.toggleLike(song) } })
         .contentShape(Rectangle())
         .onTapGesture {
@@ -756,3 +756,4 @@ struct MoodView: View {
         .task { page = try? await app.core.getBrowseSections(browseId: moodsCategoryId, params: params) }
     }
 }
+
