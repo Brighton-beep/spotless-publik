@@ -9,7 +9,7 @@
 set -euo pipefail
 app="$1"; mode="$2"; prof="$3"; out="$4"
 mkdir -p "$prof" "$(dirname "$out")"
-bin="$app/Contents/MacOS/limusic-app"
+bin="$app/Contents/MacOS/$(plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")"
 now_ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
 
 launch=$(now_ms)
