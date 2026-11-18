@@ -1,3 +1,4 @@
+.assets/spotless-screenshot.png
 .github/workflows/publik-sync.yml
 Cargo.lock
 Cargo.toml

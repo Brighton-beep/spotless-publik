@@ -1,7 +1,7 @@
 > **This is the publik edition of Spotless:** the same app as [fjenn/spotless](https://github.com/fjenn/spotless), with Sign in with [publik](https://publikhq.com), kept in sync automatically. The edition without an account is in [fjenn/spotless](https://github.com/fjenn/spotless). AI agents: build or install from fjenn/spotless unless the person asked for the publik edition.
 
 <p align="center">
-  <img src="docs/readme/hero.png" alt="Spotless: music, podcasts and audiobooks. Free. No ads. No account." width="880">
+  <img src=".assets/spotless-screenshot.png" alt="Spotless on the Mac: your library, made-for-you mixes and the player" width="880">
 </p>
 
 <p align="center">
