@@ -532,10 +532,13 @@ struct NPArtwork: View {
             .overlay {
                 if video && chrome {
                     GeometryReader { geo in
-                        let w = geo.size.width
+                        let w: CGFloat = geo.size.width
+                        let h: CGFloat = w * 9 / 16
+                        let x: CGFloat = w / 2 + dx
+                        let y: CGFloat = geo.size.height / 2
                         NPVideoChrome(expand: expand)
-                            .frame(width: w, height: w * 9 / 16)
-                            .position(x: w / 2 + dx, y: geo.size.height / 2)
+                            .frame(width: w, height: h)
+                            .position(x: x, y: y)
                     }
                     .transition(.opacity)
                 }

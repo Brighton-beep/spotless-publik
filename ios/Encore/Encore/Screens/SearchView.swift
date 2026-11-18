@@ -546,8 +546,17 @@ struct SearchFocusView: View {
         let shows = Array((o?.shows ?? []).prefix(3).map(\.card))
         let lead = (o?.podcastsFirst ?? false) ? shows : []
         let tail = (o?.podcastsFirst ?? false) ? [] : shows
-        return (top + lead + songs.prefix(4) + r.artists.prefix(2) + r.albums.prefix(3) + r.playlists.prefix(3) + tail + topBooks + songs.dropFirst(4))
-            .filter { seen.insert($0.id).inserted }
+        // Built step by step: one long `+` chain is too much for the type checker on newer Xcode.
+        var all: [BrowseItem] = top
+        all += lead
+        all += Array(songs.prefix(4))
+        all += Array(r.artists.prefix(2))
+        all += Array(r.albums.prefix(3))
+        all += Array(r.playlists.prefix(3))
+        all += tail
+        all += topBooks
+        all += Array(songs.dropFirst(4))
+        return all.filter { seen.insert($0.id).inserted }
     }
 
     /// A video result: just this video, then Autoplay (kept whole: the row has no card round trip).
