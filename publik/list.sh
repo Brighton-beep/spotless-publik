@@ -6,7 +6,8 @@
 # (publikhq.com/skills/setup.md, publish.md and api.md). The latest release
 # here must already carry the DMG: publik lists only what a release offers.
 #
-#   publik/list.sh
+#   publik/list.sh               list it, then get the app token
+#   publik/list.sh --token-only  only the app token (after claiming the listing)
 #
 # One browser approval (publik's device flow). The listing is the one publik
 # derives from this repository, with our name and summary, signed and
@@ -34,12 +35,14 @@ post() { # url out body [header-file]
 }
 
 [[ -z "$(git status --porcelain --untracked-files=no)" ]] || die "uncommitted changes"
+TOKEN_ONLY=0; [[ "${1:-}" == --token-only ]] && TOKEN_ONLY=1
 TAG="$(gh api "repos/${REPO}/releases/latest" --jq .tag_name)"
 VERSION="${TAG#v}"
 DMG="Spotless-${VERSION}.dmg"
 gh api "repos/${REPO}/releases/tags/${TAG}" --jq '.assets[] | "\(.name) \(.size) \(.digest // "")"' > "${TMP}/assets.txt"
 grep -q "^${DMG} " "${TMP}/assets.txt" || die "${TAG} has no ${DMG}"
 
+if [[ $TOKEN_ONLY == 0 ]]; then
 say "publik: derive the listing from ${REPO}"
 code="$(post "${API}/api/submit/derive" "${TMP}/derive.json" "{\"repo\":\"${REPO}\"}")"
 [[ "$(field "${TMP}/derive.json" error)" != repo_already_listed ]] || die "already listed as $(field "${TMP}/derive.json" slug)"
@@ -74,6 +77,8 @@ print("   name:     ", m["name"]); print("   summary:  ", m["summary"])
 print("   download: ", dmg, a.get("platform"), a.get("arch"))
 PY
 
+fi
+
 say "publik: sign in (approve in your browser)"
 code="$(post "${API}/api/v1/device/code" "${TMP}/code.json" '{"client_name":"Spotless publik listing"}')"
 [[ "$code" == 200 ]] || { cat "${TMP}/code.json" >&2; die "publik sign-in did not start (HTTP ${code})"; }
@@ -98,6 +103,8 @@ done
 ( umask 077; printf 'Authorization: Bearer %s\n' "$ACCESS" > "${TMP}/auth.hdr" ); unset ACCESS
 echo "approved"
 
+SLUG="$SLUG_WANT"
+if [[ $TOKEN_ONLY == 0 ]]; then
 submit() {
   python3 -Ic 'import json,sys; print(json.dumps({"confirm": True, "manifest": json.load(open(sys.argv[1]))}))' "${TMP}/manifest.json" > "${TMP}/submit.json"
   post "${API}/api/submit" "${TMP}/submitted.json" "@${TMP}/submit.json" "${TMP}/auth.hdr"
@@ -116,12 +123,15 @@ case "$code" in
 esac
 [[ "$SLUG" == "$SLUG_WANT" ]] || die "publik listed it as ${SLUG}"
 
+fi
+
 say "publik: the app token for ${SLUG}"
 code="$(post "${API}/api/v1/apps/${SLUG}/token" "${TMP}/apptoken.json" '{}' "${TMP}/auth.hdr")"
 TOKEN="$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\(pat_[^"]*\)".*/\1/p' "${TMP}/apptoken.json" | head -1)"
 if [[ "$code" != 2?? || "$TOKEN" != pat_* ]]; then
   url="$(field "${TMP}/apptoken.json" claim_url)"
   [[ "$code" == 403 && "$url" == https://publikhq.com/* ]] && { open "$url"; die "claim the listing on that page (Your app? Claim it with GitHub), then mint the token again"; }
+  sed -E 's/pat_[A-Za-z0-9_-]+/pat_…/g' "${TMP}/apptoken.json" >&2; echo >&2
   die "publik did not give an app token (HTTP ${code})"
 fi
 printf '%s\n' "$TOKEN" > "$TOKEN_FILE"; unset TOKEN
