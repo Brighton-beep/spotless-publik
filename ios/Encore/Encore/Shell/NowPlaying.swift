@@ -496,38 +496,9 @@ struct NPArtwork: View {
         _chrome = State(initialValue: chrome)
     }
 
+    // Split into three pieces: one long modifier chain is more than newer Xcode can type-check in time.
     var body: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                GeometryReader { geo in
-                    strip(width: geo.size.width)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { if video { withAnimation(.easeOut(duration: 0.2)) { chrome.toggle() } } }
-            .gesture(swipe)
-            .onChange(of: player.queue.currentIndex) { _, i in
-                if pending {
-                    // A committed swipe: the neighbour is already centred; re-centre on it in the same
-                    // frame as dx goes back to 0, so nothing moves.
-                    pending = false
-                    var t = Transaction(); t.disablesAnimations = true
-                    withTransaction(t) { shown = i; dx = 0 }
-                } else {
-                    // Next / Previous buttons, the lock screen, the queue: slide the covers across.
-                    withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.38, dampingFraction: 0.9)) { shown = i }
-                }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(!video ? "Album artwork" : VideoStore.shared.isEpisode ? "Episode video" : "Music video")
-            .accessibilityValue(video ? (VideoStore.shared.frameUp ? "playing" : "loading") : "")
-            .accessibilityHint(video ? "Double-tap for video controls. Swipe left or right to change track." : "Swipe left or right to change track.")
-            .accessibilityAddTraits(video ? .isButton : [])
-            .accessibilityAction(named: "Full screen") { if video { expand() } }
-            .accessibilityAction(named: "Next track") { if player.next != nil { player.skipNext() } }
-            .accessibilityAction(named: "Previous track") { if player.previous != nil { player.playIndex(player.queue.currentIndex - 1) } }
-            .accessibilityIdentifier(video ? "np-video" : "np-artwork")
+        accessible
             // Over the 16:9 box in the middle of the square slot, following a swipe.
             .overlay {
                 if video && chrome {
@@ -550,6 +521,46 @@ struct NPArtwork: View {
                 withAnimation(.easeOut(duration: 0.3)) { chrome = false }
             }
             .onChange(of: video) { _, on in if !on { chrome = false } }
+    }
+
+    /// The cover strip with its tap and swipe handling.
+    private var covers: some View {
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                GeometryReader { geo in
+                    strip(width: geo.size.width)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { if video { withAnimation(.easeOut(duration: 0.2)) { chrome.toggle() } } }
+            .gesture(swipe)
+            .onChange(of: player.queue.currentIndex) { _, i in
+                if pending {
+                    // A committed swipe: the neighbour is already centred; re-centre on it in the same
+                    // frame as dx goes back to 0, so nothing moves.
+                    pending = false
+                    var t = Transaction(); t.disablesAnimations = true
+                    withTransaction(t) { shown = i; dx = 0 }
+                } else {
+                    // Next / Previous buttons, the lock screen, the queue: slide the covers across.
+                    withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.38, dampingFraction: 0.9)) { shown = i }
+                }
+            }
+    }
+
+    /// VoiceOver for the strip.
+    private var accessible: some View {
+        covers
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(!video ? "Album artwork" : VideoStore.shared.isEpisode ? "Episode video" : "Music video")
+            .accessibilityValue(video ? (VideoStore.shared.frameUp ? "playing" : "loading") : "")
+            .accessibilityHint(video ? "Double-tap for video controls. Swipe left or right to change track." : "Swipe left or right to change track.")
+            .accessibilityAddTraits(video ? .isButton : [])
+            .accessibilityAction(named: "Full screen") { if video { expand() } }
+            .accessibilityAction(named: "Next track") { if player.next != nil { player.skipNext() } }
+            .accessibilityAction(named: "Previous track") { if player.previous != nil { player.playIndex(player.queue.currentIndex - 1) } }
+            .accessibilityIdentifier(video ? "np-video" : "np-artwork")
     }
 
     private func expand() {
