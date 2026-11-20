@@ -72,14 +72,14 @@ ndk="$bs/sdk/android-ndk-$v_ndk"
 toolchain="$(echo "$ndk"/toolchains/llvm/prebuilt/*)"
 mkdir -p "$out/$ABI" "$out/include"
 # mpv and FFmpeg install with --prefix=/usr/local under DESTDIR, the static deps into lib/:
-# take every shared library, wherever it landed.
-find "$prefix" -name 'lib*.so' \( -type f -o -type l \) -print | while read -r f; do
+# take every shared library, wherever it landed (sorted, so usr/local wins over lib/).
+find "$prefix" -name 'lib*.so' \( -type f -o -type l \) -print | sort | while read -r f; do
 	echo "shipping $f"
 	cp -L "$f" "$out/$ABI/"
 done
 ls "$out/$ABI"/libmpv.so >/dev/null
 cp -L "$toolchain/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$out/$ABI/"
-cp -r "$(dirname "$(find "$prefix" -path '*/include/mpv/client.h' | head -1)")" "$out/include/"
+cp -r "$(dirname "$(find "$prefix" -path '*/include/mpv/client.h' -print -quit)")" "$out/include/"
 
 # Every NEEDED entry must be either shipped here or part of Android itself.
 system="libc.so libm.so libdl.so liblog.so libandroid.so libz.so libEGL.so libGLESv2.so libGLESv3.so libOpenSLES.so libaaudio.so libmediandk.so libvulkan.so libjnigraphics.so"
@@ -91,7 +91,8 @@ for f in "$out/$ABI"/*.so; do
 		fi
 	done
 done
-"$toolchain/bin/llvm-readelf" --dyn-syms "$out/$ABI/libmpv.so" | grep -v UND | grep -qw mpv_create || { echo "libmpv.so exports no mpv_create"; fail=1; }
+syms=$("$toolchain/bin/llvm-readelf" --dyn-syms "$out/$ABI/libmpv.so")
+grep -v UND <<<"$syms" | grep -w mpv_create >/dev/null || { echo "libmpv.so exports no mpv_create"; fail=1; }
 "$toolchain/bin/llvm-readelf" -d "$out/$ABI/libmpv.so" | grep NEEDED
 ls -la "$out/$ABI"
 exit $fail
