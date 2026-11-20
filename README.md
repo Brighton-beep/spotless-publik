@@ -6,7 +6,8 @@
 
 <p align="center">
   A free music app for Mac and iPhone. Songs, podcasts and audiobooks,
-  with no ads, no account and no tracking. Open source.
+  with no ads. Open source. This edition signs in with publik and sends usage counts to publik;
+  the no-account edition is <a href="https://github.com/fjenn/spotless">fjenn/spotless</a>.
 </p>
 
 <p align="center">
@@ -88,7 +89,8 @@ same way on both.
   on your device from what you play.
 
 #### Privacy
-- No account, no analytics, no telemetry, no crash reporting. More [below](#privacy).
+- This edition signs in with [publik](https://publikhq.com) and sends usage counts to publik. No ads,
+  no other analytics, no crash reporting. More [below](#privacy).
 
 #### Mac extras
 - Menu bar controls and a mini player.
@@ -112,8 +114,13 @@ with your YouTube account, and only then.
 
 ## Privacy
 
-- **No account, no analytics, no telemetry, no crash reporting.** The developer runs no server and
-  receives nothing from the app.
+- **This edition signs in with publik and sends usage counts to publik.** At sign-in it registers
+  this install with publik (a random install id, the app version, macOS and the chip, and your Mac's
+  name). It then sends "app opened" and "active session" counts with that install id, and nothing
+  about what you listen to. Set `DO_NOT_TRACK=1` or `PUBLIK_TELEMETRY=off` to stop the counts.
+  publik's own [privacy policy](https://publikhq.com/privacy) applies. The edition with no account
+  and no telemetry is [fjenn/spotless](https://github.com/fjenn/spotless).
+- **No other analytics and no crash reporting.** The developer runs no server.
 - **Your library, playlists, history, stats and downloads stay on your device.**
 - **The app talks to third-party services directly** to work: YouTube for music and videos, and
   lyrics, podcast, audiobook and metadata services (for example LRCLIB, Apple's podcast directory,
@@ -183,11 +190,12 @@ what you play directly from the source.
 </details>
 
 <details>
-<summary><b>Why is there no account?</b></summary>
+<summary><b>Do I need an account?</b></summary>
 <br>
-Because nothing needs one. Your library, playlists and history live on your device, and there is
-no Spotless server to sign in to. The only sign-in is the optional one to YouTube, for bringing in
-your existing YouTube Music library.
+In this publik edition, yes: it opens with Sign in with publik, and sends usage counts to publik.
+Your library, playlists and history still live on your device; there is no Spotless server. If you
+want no account at all, use [fjenn/spotless](https://github.com/fjenn/spotless). Apart from that,
+the only sign-in is the optional one to YouTube, for bringing in your existing YouTube Music library.
 </details>
 
 <details>

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Privacy · Spotless</title>
-  <meta name="description" content="Spotless privacy policy: no account, no analytics, no data collected by the developer.">
+  <meta name="description" content="Spotless (publik edition) privacy policy: sign-in with publik and usage counts to publik; nothing else collected.">
   <meta name="theme-color" content="#0b0b0d">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
   <link rel="stylesheet" href="style.css">
@@ -24,7 +24,16 @@
     <h1>Privacy</h1>
     <p class="updated">Applies to Spotless for Mac and iPhone. Last updated November 2026.</p>
 
-    <p><strong>In short:</strong> Spotless does not collect personal data. There is no account, no analytics, no advertising, no tracking and no crash reporting. The developer runs no server and receives nothing from the app. Everything you do in the app stays on your device.</p>
+    <p><strong>In short:</strong> This is the publik edition of Spotless. It signs in with publik and sends usage counts to publik (see below). Apart from that there is no analytics, no advertising and no crash reporting, the developer runs no server, and your library and listening stay on your device. The edition with no account and no telemetry is <a href="https://github.com/fjenn/spotless">fjenn/spotless</a>.</p>
+
+    <h2>Sign in with publik and usage counts</h2>
+    <ul>
+      <li>When the app starts, it asks you to sign in with <a href="https://publikhq.com">publik</a>. Signing in happens on publik's own website.</li>
+      <li>At sign-in, the app registers this install with publik: a random install id, the app version, the operating system and chip, and your computer's name (its hostname).</li>
+      <li>While you use the app, it sends publik an "app opened" event and an "active session" event every 30 minutes, with that install id, the app version, the operating system and chip. They contain nothing about what you search, play or save.</li>
+      <li>To stop the usage counts, set the environment variable <code>DO_NOT_TRACK=1</code> or <code>PUBLIK_TELEMETRY=off</code>.</li>
+      <li>publik's own <a href="https://publikhq.com/privacy">privacy policy</a> applies to what publik receives.</li>
+    </ul>
 
     <h2>What stays on your device</h2>
     <ul>
@@ -45,7 +54,7 @@
       <li><strong>Playlist import:</strong> only when you import a playlist link, the service that link points to.</li>
       <li><strong>Updates (Mac):</strong> GitHub, to check for and download a new version.</li>
     </ul>
-    <p>None of these requests contain an account, an advertising identifier or a device identifier created by Spotless.</p>
+    <p>None of these requests contain your publik account, an advertising identifier or a device identifier created by Spotless.</p>
 
     <h2>Optional YouTube sign-in</h2>
     <p>You can sign in with your YouTube account to see your YouTube Music library in Spotless. You do not have to.</p>
@@ -61,7 +70,7 @@
     <p>Spotless keeps a log file on your device to help fix problems. It is never sent anywhere. If you report a bug, you can choose to copy diagnostic details and paste them into your report yourself.</p>
 
     <h2>Children</h2>
-    <p>Spotless collects no data from anyone, including children.</p>
+    <p>Apart from the publik sign-in and usage counts described above, Spotless collects no data from anyone, including children.</p>
 
     <h2>Changes and contact</h2>
     <p>If this policy changes, the new version will be published on this page. Questions: open an issue at <a href="https://github.com/fjenn/spotless/issues">github.com/fjenn/spotless/issues</a>.</p>

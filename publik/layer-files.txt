@@ -15,6 +15,8 @@ publik/rust/src/lib.rs
 publik/set-version.py
 publik/sync.sh
 README.md
+site/index.html
+site/privacy.html
 src-tauri/Cargo.toml
 src-tauri/publik-app-token.txt
 src-tauri/src/lib.rs
