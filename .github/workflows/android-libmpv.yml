@@ -13,6 +13,8 @@ on:
 
 jobs:
   build:
+    permissions:
+      contents: write # the libmpv-android release below
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -40,7 +42,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          msg=$(tail -n 70 build.log | tr -d '\r' | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          msg=$( (grep -E "UNRESOLVED|exports no|error" build.log | tail -n 30; echo ---; tail -n 40 build.log)  | tr -d '\r' | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::error title=libmpv build failed::$msg"
 
       - uses: actions/upload-artifact@v4
@@ -48,3 +50,15 @@ jobs:
           name: libmpv-android-arm64-v8a
           path: out/
           if-no-files-found: error
+
+      # A public download for local builds (android/libmpv/fetch.ps1): artifacts need a sign-in.
+      - name: Publish as the libmpv-android release
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd out && zip -qr ../libmpv-android-arm64-v8a.zip .)
+          gh release view libmpv-android >/dev/null 2>&1 ||
+            gh release create libmpv-android --prerelease --target "$GITHUB_SHA" --title "libmpv for Android (build input)" --notes "libmpv, FFmpeg and librubberband for the Android app, built by android/libmpv/build.sh. Not an app release."
+          gh release upload libmpv-android libmpv-android-arm64-v8a.zip --clobber
