@@ -360,6 +360,8 @@ pub fn ensure_signed_in(env: &Env, ui: &mut dyn GateUi) -> Passed {
 
 static STARTED: AtomicBool = AtomicBool::new(false);
 static PASSED: AtomicBool = AtomicBool::new(false);
+/// Set once the gate sent the person to publik in the browser.
+static SENT_TO_BROWSER: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
 struct Shared {
@@ -439,6 +441,7 @@ impl GateUi for WindowUi {
             log::warn!("publik: not opening an unexpected address");
             return;
         }
+        SENT_TO_BROWSER.store(true, Ordering::SeqCst);
         #[cfg(target_os = "macos")]
         let r = std::process::Command::new("open").arg(url).status();
         #[cfg(target_os = "windows")]
@@ -474,6 +477,28 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>) {
         client::start_telemetry();
         use tauri::Emitter;
         let _ = app.emit("publik-signed-in", ());
+        if SENT_TO_BROWSER.load(Ordering::SeqCst) {
+            bring_to_front(&app);
+        }
+    });
+}
+
+/// After a sign-in in the browser, put Spotless back in front, centred.
+fn bring_to_front<R: Runtime>(app: &AppHandle<R>) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        use tauri::Manager;
+        #[cfg(target_os = "macos")]
+        let _ = handle.show();
+        let window = handle
+            .get_webview_window("main")
+            .or_else(|| handle.webview_windows().into_values().next());
+        if let Some(w) = window {
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.center();
+            let _ = w.set_focus();
+        }
     });
 }
 
