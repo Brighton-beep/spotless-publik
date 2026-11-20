@@ -3840,6 +3840,7 @@ dependencies = [
  "futures-util",
  "gtk",
  "innertube",
+ "jni 0.21.1",
  "ksni",
  "libc",
  "notify",

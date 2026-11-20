@@ -857,10 +857,11 @@ pub fn run() {
             );
     }
 
-    // Android: what opens links in the browser (an intent; see `commands::open_browser`).
+    // Android: what opens links in the browser (an intent; see `commands::open_browser`), and the
+    // media session behind the lock screen and notification (mobile/media.rs).
     #[cfg(mobile)]
     {
-        builder = builder.plugin(tauri_plugin_opener::init());
+        builder = builder.plugin(tauri_plugin_opener::init()).plugin(media::init());
     }
 
     // The menu bar's items (menu.rs). Android has none.

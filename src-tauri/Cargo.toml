@@ -84,6 +84,8 @@ zbus = "5"
 [target.'cfg(target_os = "android")'.dependencies]
 # Links open in the browser through an intent (publik sign-in, commands::open_browser).
 tauri-plugin-opener = "2"
+# The media session's button presses arrive over JNI (mobile/media.rs). Same jni as wry.
+jni = "0.21"
 encore-core = { path = "../crates/core", features = ["quickjs"] }
 # rquickjs-sys ships no pregenerated bindings for Android: generate them (NDK libclang,
 # LIBCLANG_PATH). Same rquickjs as encore-core's, so this only adds the feature.
