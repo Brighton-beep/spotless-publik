@@ -56,6 +56,7 @@ mod migrate;
 mod mini;
 #[cfg_attr(mobile, path = "mobile/notify.rs")]
 mod notify;
+#[cfg_attr(mobile, path = "mobile/session.rs")]
 mod session;
 mod sync; // device sync (docs/SYNC.md)
 mod tray;
@@ -861,7 +862,10 @@ pub fn run() {
     // media session behind the lock screen and notification (mobile/media.rs).
     #[cfg(mobile)]
     {
-        builder = builder.plugin(tauri_plugin_opener::init()).plugin(media::init());
+        builder = builder
+            .plugin(tauri_plugin_opener::init())
+            .plugin(media::init())
+            .plugin(session::init());
     }
 
     // The menu bar's items (menu.rs). Android has none.
