@@ -8,6 +8,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import logo from '$lib/assets/favicon.svg';
+	import { publikGate } from './gate-state.svelte';
 
 	type Screen = {
 		id: string;
@@ -45,6 +46,10 @@
 			if (timer) clearInterval(timer);
 			void off.then((f) => f());
 		};
+	});
+
+	$effect(() => {
+		publikGate.open = !checked || screen !== null;
 	});
 
 	const press = (id: string) => void invoke('publik_gate_press', { id }).catch(() => {});

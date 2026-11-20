@@ -4,6 +4,7 @@
 	// widths, player bar 72px. The mini player window renders only <MiniPlayer/>.
 	import './layout.css';
 	import PublikGate from '$lib/publik/Gate.svelte'; // publik edition (publik/README.md)
+	import { publikGate } from '$lib/publik/gate-state.svelte'; // publik edition
 	import favicon from '$lib/assets/favicon.svg';
 	import { browser } from '$app/environment';
 	import { afterNavigate, goto } from '$app/navigation';
@@ -352,7 +353,7 @@
 		<MenuHost />
 		<ConfirmHost />
 		<Toaster />
-		<GlobalBanners />
+		{#if !publikGate.open}<GlobalBanners />{/if}<!-- publik edition: first-run screens wait for the sign-in -->
 
 		{#if updateState.available}
 			<div

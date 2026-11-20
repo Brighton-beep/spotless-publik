@@ -21,5 +21,6 @@ src-tauri/Cargo.toml
 src-tauri/publik-app-token.txt
 src-tauri/src/lib.rs
 src-tauri/tauri.conf.json
+ui/src/lib/publik/gate-state.svelte.ts
 ui/src/lib/publik/Gate.svelte
 ui/src/routes/+layout.svelte
