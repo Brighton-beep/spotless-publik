@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "app.spotless.android",
+  "bundle": {
+    "android": {
+      "minSdkVersion": 26
+    }
+  }
+}

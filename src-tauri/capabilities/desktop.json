@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "the desktop-only plugins (updater, global hotkeys); not built for Android",
+  "platforms": ["linux", "macOS", "windows"],
+  "windows": [
+    "main",
+    "mini"
+  ],
+  "permissions": [
+    "updater:default",
+    "global-shortcut:default"
+  ]
+}

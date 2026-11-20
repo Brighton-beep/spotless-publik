@@ -33,8 +33,15 @@ impl Host for TauriHost {
         self.app.path().download_dir().ok()
     }
 
+    #[cfg(not(target_os = "android"))]
     fn js_engine(&self) -> Option<Arc<dyn JsEngine>> {
         Some(Arc::new(crate::webview::WebviewEngine::new(self.app.clone())))
+    }
+
+    /// Android runs one webview per app, so the cipher runs in-process in QuickJS instead.
+    #[cfg(target_os = "android")]
+    fn js_engine(&self) -> Option<Arc<dyn JsEngine>> {
+        Some(Arc::new(encore_core::js::InProcEngine::quickjs()))
     }
 
     fn allow_asset_file(&self, path: &Path) {

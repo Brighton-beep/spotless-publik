@@ -47,16 +47,21 @@ mod hotkeys;
 #[cfg(target_os = "macos")]
 mod install; // stream: installer (move to /Applications on first launch)
 mod library;
+#[cfg_attr(mobile, path = "mobile/media.rs")]
 mod media;
+#[cfg_attr(mobile, path = "mobile/menu.rs")]
 mod menu;
 mod migrate;
+#[cfg_attr(mobile, path = "mobile/mini.rs")]
 mod mini;
+#[cfg_attr(mobile, path = "mobile/notify.rs")]
 mod notify;
 mod session;
 mod sync; // device sync (docs/SYNC.md)
 mod tray;
 mod webproxy;
 mod webview;
+#[cfg_attr(mobile, path = "mobile/winframe.rs")]
 mod winframe; // stream: parity2 (main window frame survives full screen / no clean exit)
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -412,6 +417,7 @@ fn release_on_destroy(webview: &tauri::Webview) {
     });
 }
 
+// Desktop window geometry (below, to `default_window_size`): Android windows are full screen.
 /// Pull the main window back onto a display if the window-state plugin restored it somewhere that
 /// no longer exists (#459). The plugin keeps a saved position when any one corner lands on a
 /// monitor, so after a layout change the window could come back with only its invisible resize
@@ -420,6 +426,7 @@ fn release_on_destroy(webview: &tauri::Webview) {
 ///
 /// Wayland gives the app no real position and ignores `center`, which is fine: the compositor
 /// places the window there, so the bug cannot happen.
+#[cfg(desktop)]
 fn keep_on_screen(w: &tauri::WebviewWindow) {
     let (Ok(p), Ok(size)) = (w.outer_position(), w.outer_size()) else { return };
     if mini::on_a_display(w, p, size) {
@@ -442,6 +449,7 @@ fn keep_on_screen(w: &tauri::WebviewWindow) {
 /// The whole window inside the work area of the display it's on: a window whose middle is on
 /// screen but whose bottom (or title bar) is under the Dock or past the edge gets shrunk to fit and
 /// centred. First launch from the DMG once opened with the welcome dialog below the screen.
+#[cfg(desktop)]
 fn fit_work_area(w: &tauri::WebviewWindow, p: tauri::PhysicalPosition<i32>, size: tauri::PhysicalSize<u32>) {
     let Ok(Some(m)) = w.current_monitor() else { return };
     let (a, sz) = (m.work_area().position, m.work_area().size);
@@ -476,6 +484,7 @@ const DEFAULT_SIZE_KEY: &str = "window_default_size_v2";
 
 /// Spotify opens big: 90% of the display the window is on, capped at 1600x1000 logical and never
 /// under 1280x832 unless the display itself is smaller, centred.
+#[cfg(desktop)]
 fn first_launch_size(w: &tauri::WebviewWindow) {
     let Ok(Some(m)) = w.current_monitor().or_else(|_| w.primary_monitor()) else { return };
     let scale = m.scale_factor();
@@ -511,7 +520,6 @@ mod default_size_tests {
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Logs to stdout **and** to `<app data>/limusic.log`, truncated each launch (the previous run is
 /// kept as `limusic.log.1`).
 ///
@@ -673,6 +681,7 @@ fn should_start_minimized(db: &Db) -> bool {
 /// Tauri entry point. Applies the platform boot fixes (open-fd limit, NVIDIA/WebKit env), restores
 /// the persisted session, wires every command and plugin, and runs the event loop. context/01
 /// §startup.
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // publik edition: the app's version for publik, and its release self test (publik/README.md).
     publik::start(env!("CARGO_PKG_VERSION"));
@@ -769,7 +778,7 @@ pub fn run() {
     let move_offer = install::pending();
     #[cfg(target_os = "macos")]
     let single_instance = move_offer.is_none();
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(desktop, not(target_os = "macos")))]
     let single_instance = true;
 
     // Must be the first plugin registered (its documented requirement). A second launch —
@@ -782,6 +791,7 @@ pub fn run() {
     // the two fight over it, which is what the guard exists to prevent:
     //
     //     LIMUSIC_MULTI=1 XDG_DATA_HOME=/tmp/limusic-b ./target/debug/limusic-app
+    #[cfg(desktop)]
     if single_instance && std::env::var_os("LIMUSIC_MULTI").is_none() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             tray::show_main(app);
@@ -816,6 +826,43 @@ pub fn run() {
     }
     // ── end stream: perf ──
 
+    // Desktop only: self-update, launch at login, the saved window frame and system-wide hotkeys.
+    // None of them exist on Android (the Play-style update is a new APK; the app is full screen).
+    #[cfg(desktop)]
+    {
+        builder = builder
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                Some(vec!["--autostart"]),
+            ))
+            // Reopen at the size/position the window was left at. Only "main": the mini widget is
+            // fixed-size and the login/cipher/PoToken webviews are windows too. Size, position and
+            // maximized only — VISIBLE would restore a window hidden to the tray as invisible, and
+            // DECORATIONS would fight the custom titlebar.
+            .plugin(
+                tauri_plugin_window_state::Builder::new()
+                    .with_state_flags(winframe::FLAGS)
+                    .with_filter(|label| label == "main")
+                    .build(),
+            )
+            .plugin(
+                tauri_plugin_global_shortcut::Builder::new()
+                    .with_handler(|app, shortcut, event| {
+                        if let Some(mgr) = app.try_state::<Arc<hotkeys::HotkeysManager>>() {
+                            mgr.handle_event(app, shortcut, event.state());
+                        }
+                    })
+                    .build(),
+            );
+    }
+
+    // The menu bar's items (menu.rs). Android has none.
+    #[cfg(desktop)]
+    {
+        builder = builder.on_menu_event(|app, event| menu::handle(app, event.id().as_ref()));
+    }
+
     builder
         // The hidden cipher webview's document (webview.rs). A registered scheme, because a
         // `data:` URL is not a document WebView2 will navigate to.
@@ -828,7 +875,6 @@ pub fn run() {
         // `spotless://` / `encore://` links and https links opened with the app (deeplink.rs). On macOS they arrive
         // as Apple Events (`RunEvent::Opened`), which this plugin turns into `deep-link://new-url`.
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         // Folder picker for the local-music library (local.rs).
         .plugin(tauri_plugin_dialog::init())
@@ -837,29 +883,6 @@ pub fn run() {
         // Fedora every copy button in the app silently did nothing. The OS clipboard from the app
         // process has no such gate. See ui/src/lib/clipboard.ts.
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--autostart"]),
-        ))
-        // Reopen at the size/position the window was left at. Only "main": the mini widget is
-        // fixed-size and the login/cipher/PoToken webviews are windows too. Size, position and
-        // maximized only — VISIBLE would restore a window hidden to the tray as invisible, and
-        // DECORATIONS would fight the custom titlebar.
-        .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(winframe::FLAGS)
-                .with_filter(|label| label == "main")
-                .build(),
-        )
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, shortcut, event| {
-                    if let Some(mgr) = app.try_state::<Arc<hotkeys::HotkeysManager>>() {
-                        mgr.handle_event(app, shortcut, event.state());
-                    }
-                })
-                .build(),
-        )
         .setup(move |app| {
             let handle = app.handle().clone();
             // publik edition: sign in with publik before the app (publik/README.md).
@@ -937,13 +960,18 @@ pub fn run() {
                     http::proxied(tauri::WebviewWindowBuilder::from_config(&handle, config)?)
                         .build()?;
                 // ── stream: fix-data ── Spotify-size first launch (see `first_launch_size`).
-                if db.get_setting(DEFAULT_SIZE_KEY).is_none() {
+                #[cfg(desktop)]
+                {
+                    if db.get_setting(DEFAULT_SIZE_KEY).is_none() {
                     first_launch_size(&w);
                     db.set_setting(DEFAULT_SIZE_KEY, "1");
                 }
                 keep_on_screen(&w);
+                }
+                #[cfg(mobile)]
+                let _ = w;
             }
-            #[cfg_attr(target_os = "macos", allow(unused_variables))]
+            #[cfg_attr(any(target_os = "macos", mobile), allow(unused_variables))]
             let system_titlebar = db.get_setting("system_titlebar").as_deref() == Some("true");
 
             // OS media controls (MPRIS/SMTC/NowPlaying). Its callback resolves AppState lazily, so
@@ -979,6 +1007,7 @@ pub fn run() {
             // pointing at nothing. So an installed build repoints an existing entry at itself.
             // Only an existing one: `is_enabled` is false after a Task Manager disable on Windows,
             // and that choice is the user's.
+            #[cfg(desktop)]
             if !tauri::is_dev() {
                 use tauri_plugin_autostart::ManagerExt;
                 let al = app.autolaunch();
@@ -998,6 +1027,7 @@ pub fn run() {
             }
 
             // Native menu bar (menu.rs). UI items reach the page as `menu://<id>` events.
+            #[cfg(desktop)]
             match menu::build(&handle) {
                 Ok(m) => {
                     if let Err(e) = app.set_menu(m) {
@@ -1081,7 +1111,7 @@ pub fn run() {
             // is created undecorated, so this is the one place that reverses it; macOS never gets
             // here, its traffic lights come from `tauri.macos.conf.json`. Done before the SPA shows
             // the window, so the frame is already there rather than popping in.
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(all(desktop, not(target_os = "macos")))]
             if system_titlebar {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.set_decorations(true);
@@ -1420,7 +1450,6 @@ pub fn run() {
             downloads::commands::downloads_songs,
             // ── end stream: downloads ──
         ]))
-        .on_menu_event(|app, event| menu::handle(app, event.id().as_ref()))
         .on_window_event(|window, event| {
             winframe::on_event(window, event); // ── stream: parity2 ──
             // Close-to-tray: ✕ hides the main window and playback keeps running; real quit is

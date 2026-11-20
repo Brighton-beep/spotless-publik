@@ -34,3 +34,8 @@ rand = "0.8"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# rustypipe-botguard with reqwest on rustls instead of native-tls (OpenSSL on Android). See
+# vendor/rustypipe-botguard/SPOTLESS-PATCH.md.
+[patch.crates-io]
+rustypipe-botguard = { path = "vendor/rustypipe-botguard" }

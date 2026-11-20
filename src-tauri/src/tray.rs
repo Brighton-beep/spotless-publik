@@ -22,7 +22,7 @@ pub use imp::{init, set_playing, set_track};
 /// the app running with no window and no way back except a second launch, so ✕ checks this before
 /// hiding. Optimistic: cleared by the Linux backend once it knows there is no watcher, and by
 /// [`set_available`] when `init` fails.
-static AVAILABLE: AtomicBool = AtomicBool::new(true);
+static AVAILABLE: AtomicBool = AtomicBool::new(cfg!(desktop));
 
 /// Can the window be brought back from the tray? See [`AVAILABLE`].
 pub fn available() -> bool {
@@ -40,6 +40,7 @@ pub fn show_main(app: &AppHandle) {
     crate::mini::close(app);
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
+        #[cfg(desktop)]
         let _ = w.unminimize();
         let _ = w.set_focus();
         set_main_visible(app, true);
@@ -94,6 +95,7 @@ fn handle_menu(app: &AppHandle, id: &str) {
     }
 }
 
+#[cfg(desktop)]
 mod imp {
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
     use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
@@ -213,6 +215,20 @@ mod imp {
             refresh_title(app, &t);
         }
     }
+}
+
+/// Android has no tray: the player notification (MediaSession, gen/android) is where playback is
+/// controlled from outside the app. [`available`] is false there, so the close button never hides
+/// to a tray.
+#[cfg(mobile)]
+mod imp {
+    use tauri::AppHandle;
+
+    pub fn init(_app: &AppHandle) -> tauri::Result<()> {
+        Ok(())
+    }
+    pub fn set_playing(_app: &AppHandle, _playing: bool) {}
+    pub fn set_track(_app: &AppHandle, _title: &str, _artists: &str) {}
 }
 
 #[cfg(test)]

@@ -22,12 +22,8 @@ tokio = { workspace = true, features = ["net", "io-util", "sync"] }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tauri = { version = "2", features = ["tray-icon", "protocol-asset", "macos-private-api", "image-png"] }
-tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
-tauri-plugin-single-instance = "2"
 tauri-plugin-deep-link = "2"
-tauri-plugin-autostart = "2"
-tauri-plugin-global-shortcut = "2"
 regex = "1"
 urlencoding = "2"
 
@@ -37,11 +33,20 @@ urlencoding = "2"
 encore-core = { path = "../crates/core" }
 innertube = { path = "../crates/innertube" }
 player = { path = "../crates/player" }
-souvlaki = { version = "0.8.3", default-features = false, features = ["use_zbus"] }
 futures-util = { workspace = true }
 tauri-plugin-dialog = "2.7.2"
-tauri-plugin-window-state = "2.4.1"
 tauri-plugin-clipboard-manager = "2.3.2"
+
+# Desktop only. On Android: no updater, single instance, autostart, global hotkeys or window
+# geometry to restore; the lock screen and notification shade come from a Media3 MediaSession
+# (gen/android) instead of souvlaki, and track-change notifications are that same notification.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-window-state = "2.4.1"
+souvlaki = { version = "0.8.3", default-features = false, features = ["use_zbus"] }
 # Track-change notifications (notify.rs): D-Bus on Linux, WinRT toasts, NSUserNotification.
 notify-rust = "4"
 
@@ -74,3 +79,10 @@ libc = "0.2"
 webkit2gtk = { version = "2.0", features = ["v2_40"] }
 # Holding off suspend while playing (inhibit.rs, #347). Already in the tree through notify-rust.
 zbus = "5"
+
+# Android: the cipher runs in QuickJS (host.rs), since an Android app has a single webview.
+[target.'cfg(target_os = "android")'.dependencies]
+encore-core = { path = "../crates/core", features = ["quickjs"] }
+# rquickjs-sys ships no pregenerated bindings for Android: generate them (NDK libclang,
+# LIBCLANG_PATH). Same rquickjs as encore-core's, so this only adds the feature.
+rquickjs = { version = "0.9", features = ["bindgen"] }

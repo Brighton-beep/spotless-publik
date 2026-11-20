@@ -71,11 +71,15 @@ rquickjs = { version = "0.9", optional = true }
 
 # Desktop-only heavyweights, behind the features above. Target-gated as well, so a plain
 # `cargo build -p encore-core --target aarch64-apple-ios-sim` (default features) leaves them out.
-[target.'cfg(not(target_os = "ios"))'.dependencies]
+# No prebuilt V8 for iOS or Android (rusty_v8 publishes neither), so neither gets BotGuard. Both
+# stream through the iOS client chain, which needs no PoToken (orchestrator::main_stream_last).
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 # BotGuard runs under deno_core + JSDOM, NOT in a hidden webview. Every token a real browser engine
 # mints is rejected by googlevideo; a minimal-DOM runtime is the only one that produces an accepted
 # one. Measured in `progress/active/webremix-stream-403.md`. This pulls in V8.
 rustypipe-botguard = { version = "0.1.2", optional = true }
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
 # Held at 0.30: every lindera from 0.35 on needs encoding_rs >= 0.8.35, and rustypipe-botguard's
 # deno_web pins =0.8.33. 0.31 to 0.34 fetch IPADIC from hosts that are gone.
 lindera = { version = "=0.30.0", default-features = false, features = ["ipadic"], optional = true }

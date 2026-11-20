@@ -13,9 +13,9 @@
 //! `/GenerateIT` hands that attestation an integrity token of the wrong class. See `botguard.rs`
 //! and `progress/KNOWN-ISSUES.md` KI-1.
 
-#[cfg(all(feature = "botguard", not(target_os = "ios")))]
+#[cfg(all(feature = "botguard", not(any(target_os = "ios", target_os = "android"))))]
 mod botguard;
-#[cfg(not(all(feature = "botguard", not(target_os = "ios"))))]
+#[cfg(not(all(feature = "botguard", not(any(target_os = "ios", target_os = "android")))))]
 #[path = "botguard_off.rs"]
 mod botguard;
 

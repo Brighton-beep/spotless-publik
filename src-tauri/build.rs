@@ -18,5 +18,21 @@ fn main() {
     // leaves `generate_context!` emitting the old `default_window_icon` (window, tray, taskbar).
     println!("cargo:rerun-if-changed=icons");
 
+    // Android: libmpv and the FFmpeg it needs are prebuilt by CI (android/libmpv, the
+    // android-libmpv workflow) into the APK's jniLibs. Link against those same files.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+        let abi = match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+            Ok("aarch64") => "arm64-v8a",
+            Ok("arm") => "armeabi-v7a",
+            Ok("x86_64") => "x86_64",
+            _ => "x86",
+        };
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("gen/android/app/src/main/jniLibs")
+            .join(abi);
+        println!("cargo:rerun-if-changed={}", dir.display());
+        println!("cargo:rustc-link-search=native={}", dir.display());
+    }
+
     tauri_build::build()
 }

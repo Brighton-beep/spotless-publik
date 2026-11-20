@@ -35,7 +35,7 @@ pub async fn set_volume(state: St<'_>, volume: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn set_setting(
-    app: tauri::AppHandle,
+    #[cfg_attr(mobile, allow(unused_variables))] app: tauri::AppHandle,
     state: St<'_>,
     key: String,
     value: String,
@@ -47,6 +47,7 @@ pub async fn set_setting(
     // startup repoints an existing entry at the running binary (lib.rs). Before the write, so a
     // failure leaves the setting as it was. A dev build would register itself, and at login its
     // window needs a vite server that isn't running.
+    #[cfg(desktop)]
     if key == "autostart" {
         if tauri::is_dev() {
             return Err(
@@ -71,7 +72,7 @@ pub async fn set_setting(
     }
     // Hand the frame back to the compositor (or take it again). macOS is not on this path: its
     // titlebar style is fixed at window creation, so the setting is hidden there.
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(desktop, not(target_os = "macos")))]
     if key == "system_titlebar" {
         use tauri::Manager;
         if let Some(w) = app.get_webview_window("main") {
@@ -190,6 +191,7 @@ pub async fn show_main(state: St<'_>, window: tauri::WebviewWindow) -> Result<bo
         return Ok(false);
     }
     window.show().map_err(|e| e.to_string())?;
+    #[cfg(desktop)]
     window.unminimize().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     crate::tray::set_main_visible(window.app_handle(), true);
@@ -359,9 +361,15 @@ pub fn theater_fullscreen(window: tauri::WebviewWindow, on: bool) -> Result<(), 
         return Ok(());
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(desktop, not(target_os = "windows")))]
     {
         window.set_fullscreen(on).map_err(|e| e.to_string())
+    }
+    // Android: hiding the status and navigation bars (immersive mode) is the activity's job; M6.
+    #[cfg(mobile)]
+    {
+        let _ = on;
+        Ok(())
     }
     #[cfg(target_os = "windows")]
     {

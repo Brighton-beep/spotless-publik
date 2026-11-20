@@ -22,11 +22,12 @@ use tokio::sync::Mutex;
 use crate::cipher::CipherDeobfuscator;
 use crate::potoken::PoTokenGenerator;
 
-/// Whether the main client's stream is the last resort rather than the first choice (iOS).
+/// Whether the main client's stream is the last resort rather than the first choice (iOS, and
+/// Android, which has no BotGuard either).
 /// `ENCORE_IOS_CHAIN` turns the iOS chain on elsewhere, for the latency bench
 /// (`firstaudio_bench.rs`).
 pub fn main_stream_last() -> bool {
-    cfg!(target_os = "ios") || std::env::var_os("ENCORE_IOS_CHAIN").is_some()
+    cfg!(any(target_os = "ios", target_os = "android")) || std::env::var_os("ENCORE_IOS_CHAIN").is_some()
 }
 
 /// Everything the player + UI + media layer need for one track. context/06 PlaybackData.

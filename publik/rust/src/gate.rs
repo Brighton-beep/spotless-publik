@@ -494,8 +494,11 @@ fn bring_to_front<R: Runtime>(app: &AppHandle<R>) {
             .get_webview_window("main")
             .or_else(|| handle.webview_windows().into_values().next());
         if let Some(w) = window {
+            // Android: one full-screen window, nothing to unminimize or centre.
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             let _ = w.unminimize();
             let _ = w.show();
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             let _ = w.center();
             let _ = w.set_focus();
         }

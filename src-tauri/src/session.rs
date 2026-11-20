@@ -86,6 +86,7 @@ pub fn open_login(app: AppHandle, state: Arc<AppState>, add_account: bool) {
     let dispatched = app.run_on_main_thread(move || {
         // Already open: bring it back rather than building a second one under the same label.
         if let Some(w) = app2.get_webview_window(LOGIN_LABEL) {
+            #[cfg(desktop)]
             let _ = w.unminimize();
             let _ = w.show();
             let _ = w.set_focus();
@@ -111,9 +112,10 @@ pub fn open_login(app: AppHandle, state: Arc<AppState>, add_account: bool) {
         let tx2 = tx.clone();
         let builder = WebviewWindowBuilder::new(&app2, LOGIN_LABEL, WebviewUrl::External(url))
             .title("Sign in to YouTube Music · Spotless")
-            .inner_size(LOGIN_SIZE.0, LOGIN_SIZE.1)
-            .skip_taskbar(true)
-            .minimizable(false)
+            .inner_size(LOGIN_SIZE.0, LOGIN_SIZE.1);
+        #[cfg(desktop)]
+        let builder = builder.skip_taskbar(true).minimizable(false);
+        let builder = builder
             .on_page_load(move |_w, _payload| {
                 let _ = tx.send(());
             })
@@ -125,7 +127,9 @@ pub fn open_login(app: AppHandle, state: Arc<AppState>, add_account: bool) {
             Some(ua) => builder.user_agent(ua),
             None => builder,
         };
+        #[cfg(desktop)]
         let main = app2.get_webview_window("main").filter(|m| m.is_visible().unwrap_or(false));
+        #[cfg(desktop)]
         let builder = match main {
             Some(main) => {
                 let builder = match centred_on(&main) {
@@ -301,10 +305,9 @@ pub async fn refresh_session(app: AppHandle, state: Arc<AppState>) {
         let builder = WebviewWindowBuilder::new(&app2, REFRESH_LABEL, WebviewUrl::External(url))
             .title("YouTube Music")
             .visible(false)
-            .inner_size(1024.0, 768.0)
-            .skip_taskbar(true)
-            .decorations(false)
-            .focused(false);
+            .inner_size(1024.0, 768.0);
+        #[cfg(desktop)]
+        let builder = builder.skip_taskbar(true).decorations(false).focused(false);
         let builder = match LOGIN_UA {
             Some(ua) => builder.user_agent(ua),
             None => builder,
