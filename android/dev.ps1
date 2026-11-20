@@ -35,16 +35,29 @@ if (-not $NoUi) {
 }
 
 $profile = if ($Release) { 'release' } else { 'debug' }
-$cargoArgs = @('build', '-p', 'limusic-app', '--lib', '--target', 'aarch64-linux-android', '--features', 'tauri/custom-protocol')
-if ($Release) { $cargoArgs += '--release' }
-Push-Location $root; cargo @cargoArgs; $rc = $LASTEXITCODE; Pop-Location
-if ($rc) { throw 'cargo build failed' }
+# The Tauri CLI builds the Rust library and regenerates the Gradle wiring for the plugins
+# (tauri.settings.gradle, app/tauri.build.gradle.kts). Its last step, symlinking the library into
+# jniLibs, fails without Developer Mode; that one failure is expected and handled below.
+$noBefore = Join-Path $env:TEMP 'spotless-nobefore.json'
+Set-Content -Encoding ascii $noBefore '{"build":{"beforeBuildCommand":""}}'
+$cliArgs = @('android', 'build', '--target', 'aarch64', '--apk', '--config', $noBefore)
+if (-not $Release) { $cliArgs += '--debug' }
+Push-Location $root
+# The CLI logs to stderr, which Windows PowerShell turns into errors under 'Stop'.
+$ErrorActionPreference = 'Continue'
+$log = & "$root\ui\node_modules\.bin\tauri.cmd" @cliArgs 2>&1 | ForEach-Object { "$_" }
+$rc = $LASTEXITCODE; Pop-Location
+$ErrorActionPreference = 'Stop'
+if ($rc -and -not ($log -match 'Failed to create a symbolic link')) { $log | Select-Object -Last 40 | Out-Host; throw 'tauri android build failed' }
 
 Copy-Item "$root\target\aarch64-linux-android\$profile\libapp_lib.so" $jni -Force
 Get-ChildItem $jni *.so | ForEach-Object { & "$tc\bin\llvm-strip.exe" --strip-unneeded $_.FullName }
 
 $variant = if ($Release) { 'Release' } else { 'Debug' }
 Push-Location "$root\src-tauri\gen\android"
+# Gradle rewrites an existing APK in place and keeps the replaced entries' bytes: 146 MB of
+# content grew to a 658 MB file. Start from nothing.
+Remove-Item "app\build\outputs\apk", "app\build\intermediates\apk" -Recurse -Force -ErrorAction SilentlyContinue
 & .\gradlew.bat "assembleArm64$variant" -x "rustBuildArm64$variant" -PabiList=arm64-v8a -PtargetList=aarch64 --console=plain -q
 $rc = $LASTEXITCODE; Pop-Location
 if ($rc) { throw 'gradle failed' }

@@ -82,6 +82,8 @@ zbus = "5"
 
 # Android: the cipher runs in QuickJS (host.rs), since an Android app has a single webview.
 [target.'cfg(target_os = "android")'.dependencies]
+# Links open in the browser through an intent (publik sign-in, commands::open_browser).
+tauri-plugin-opener = "2"
 encore-core = { path = "../crates/core", features = ["quickjs"] }
 # rquickjs-sys ships no pregenerated bindings for Android: generate them (NDK libclang,
 # LIBCLANG_PATH). Same rquickjs as encore-core's, so this only adds the feature.

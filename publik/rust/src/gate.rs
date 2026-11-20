@@ -363,6 +363,10 @@ static PASSED: AtomicBool = AtomicBool::new(false);
 /// Set once the gate sent the person to publik in the browser.
 static SENT_TO_BROWSER: AtomicBool = AtomicBool::new(false);
 
+/// How the app opens a link where no `open` / `xdg-open` command exists (Android: an intent, through
+/// the app's opener plugin). Set once by the app before [`spawn`]; unset on the desktop.
+pub static URL_OPENER: OnceLock<Box<dyn Fn(&str) -> Result<(), String> + Send + Sync>> = OnceLock::new();
+
 #[derive(Default)]
 struct Shared {
     screen: Mutex<Option<Screen>>,
@@ -442,12 +446,20 @@ impl GateUi for WindowUi {
             return;
         }
         SENT_TO_BROWSER.store(true, Ordering::SeqCst);
+        if let Some(open) = URL_OPENER.get() {
+            if let Err(e) = open(url) {
+                log::warn!("publik: could not open the browser: {e}");
+            }
+            return;
+        }
         #[cfg(target_os = "macos")]
         let r = std::process::Command::new("open").arg(url).status();
         #[cfg(target_os = "windows")]
         let r = std::process::Command::new("cmd").args(["/C", "start", "", url]).status();
-        #[cfg(all(unix, not(target_os = "macos")))]
+        #[cfg(all(unix, not(target_os = "macos"), not(target_os = "android")))]
         let r = std::process::Command::new("xdg-open").arg(url).status();
+        #[cfg(target_os = "android")]
+        let r: std::io::Result<()> = Err(std::io::Error::other("no URL_OPENER set"));
         if let Err(e) = r {
             log::warn!("publik: could not open the browser: {e}");
         }

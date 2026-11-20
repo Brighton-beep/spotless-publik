@@ -257,12 +257,23 @@ pub(crate) fn open_browser(url: &str) -> Result<(), String> {
         .ok()
         .filter(|u| matches!(u.scheme(), "http" | "https"))
         .ok_or_else(|| "only http(s) links".to_string())?;
+    #[cfg(mobile)]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        let app = APP.get().ok_or("the app is not up yet")?;
+        return app.opener().open_url(url.as_str(), None::<&str>).map_err(|e| format!("Couldn't open the browser: {e}"));
+    }
     #[cfg(target_os = "macos")]
     let cmd = std::process::Command::new("open").arg(url.as_str()).spawn().map(|_| ());
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(desktop, not(target_os = "macos")))]
     let cmd = std::process::Command::new("xdg-open").arg(url.as_str()).spawn().map(|_| ());
+    #[cfg(desktop)]
     cmd.map_err(|e| format!("Couldn't open the browser: {e}"))
 }
+
+/// The app, for [`open_browser`] on Android (set in lib.rs `setup`).
+#[cfg(mobile)]
+pub(crate) static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
 /// Real quit from the UI (Ctrl+Q / Cmd+Q). Positions are saved by the Exit handler in lib.rs.
 #[tauri::command]

@@ -857,6 +857,12 @@ pub fn run() {
             );
     }
 
+    // Android: what opens links in the browser (an intent; see `commands::open_browser`).
+    #[cfg(mobile)]
+    {
+        builder = builder.plugin(tauri_plugin_opener::init());
+    }
+
     // The menu bar's items (menu.rs). Android has none.
     #[cfg(desktop)]
     {
@@ -885,6 +891,16 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(move |app| {
             let handle = app.handle().clone();
+            // Android has no `xdg-open`: links go out as intents through the opener plugin.
+            #[cfg(mobile)]
+            {
+                let _ = commands::APP.set(handle.clone());
+                let h = handle.clone();
+                let _ = publik::gate::URL_OPENER.set(Box::new(move |url: &str| {
+                    use tauri_plugin_opener::OpenerExt;
+                    h.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+                }));
+            }
             // publik edition: sign in with publik before the app (publik/README.md).
             publik::gate::spawn(&handle);
 
@@ -1625,3 +1641,4 @@ mod tests {
         assert!(!close_hides(Some("false")));
     }
 }
+
