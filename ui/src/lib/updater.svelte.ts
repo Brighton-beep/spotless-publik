@@ -14,7 +14,8 @@ import { isNewer, isPrerelease } from './version';
 import { getVersion } from '@tauri-apps/api/app';
 
 /** The kill switch (see the header). */
-export const UPDATER_ENABLED = true;
+// Off on Android: Tauri's updater has no mobile side, so a new version there is a new APK.
+export const UPDATER_ENABLED = !(typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent));
 
 const RELEASES_URL = 'https://github.com/fjenn/spotless/releases/latest';
 
@@ -76,7 +77,7 @@ export async function checkForUpdatesQuiet() {
  *  into `updateState.result` (and returns it). */
 export async function checkForUpdatesInteractive(): Promise<{ message: string; error: boolean; available: boolean }> {
 	if (!UPDATER_ENABLED)
-		return (updateState.result = { message: 'Automatic updates are not available yet.', error: false, available: false });
+		return (updateState.result = { message: 'Automatic updates are not available here. Install the new APK to update.', error: false, available: false });
 	if (updateState.checking) return updateState.result ?? { message: '', error: false, available: false };
 	updateState.checking = true;
 	updateState.result = null;

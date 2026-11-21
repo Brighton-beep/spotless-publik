@@ -36,7 +36,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 <div
-	class="group flex h-[104px] cursor-pointer items-center gap-6 rounded-md bg-bg-tinted p-4 transition-colors duration-200 ease-productive hover:bg-bg-tinted-highlight"
+	class="group flex h-[104px] cursor-pointer items-center gap-6 [.phone_&]:h-[88px] [.phone_&]:gap-3 [.phone_&]:p-3 rounded-md bg-bg-tinted p-4 transition-colors duration-200 ease-productive hover:bg-bg-tinted-highlight"
 	onclick={open}
 	oncontextmenu={(e) => {
 		if (!music) return;
@@ -47,21 +47,21 @@
 	<img
 		src={thumb(item.thumbnail, 160)}
 		alt=""
-		class="size-[72px] shrink-0 bg-bg-menu object-cover shadow-card-image {item.kind === 'artist'
+		class="size-[72px] [.phone_&]:size-16 shrink-0 bg-bg-menu object-cover shadow-card-image {item.kind === 'artist'
 			? 'rounded-full'
 			: 'rounded-sm'}"
 	/>
 	<div class="min-w-0 flex-1">
 		{#if href}
-			<a {href} class="block truncate font-title text-xl font-bold text-white hover:underline" onclick={() => onOpen?.()}
+			<a {href} class="block truncate font-title text-xl [.phone_&]:text-lg font-bold text-white hover:underline" onclick={() => onOpen?.()}
 				>{item.title}</a
 			>
 		{:else}
-			<span class="block truncate font-title text-xl font-bold text-white">{item.title}</span>
+			<span class="block truncate font-title text-xl [.phone_&]:text-lg font-bold text-white">{item.title}</span>
 		{/if}
 		<div class="truncate text-sm text-text-subdued">{line}</div>
 	</div>
-	<div class="flex shrink-0 items-center gap-6">
+	<div class="flex shrink-0 items-center gap-6 [.phone_&]:gap-2">
 		{#if item.kind === 'artist'}
 			<Pill variant="outline" onclick={() => music && actions.toggleInLibrary(music)}>{followed ? 'Following' : 'Follow'}</Pill>
 		{/if}

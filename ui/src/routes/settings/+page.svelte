@@ -368,7 +368,7 @@
 	<h2 {id} class="mt-6 mb-1 scroll-mt-4 text-base font-bold text-white">{title}</h2>
 {/snippet}
 
-<div class="max-w-[804px] px-8 pt-8 pb-16" bind:this={content}>
+<div class="max-w-[804px] px-8 [.phone_&]:px-4 [.phone_&]:pt-4 pt-8 pb-16" bind:this={content}>
 	<!-- Title at y 96 and "Account" at y 175 at the audit viewport, like Spotify. -->
 	<header class="flex items-center justify-between gap-4 pb-3">
 		<h1 class="text-2xl font-bold text-white">Settings</h1>

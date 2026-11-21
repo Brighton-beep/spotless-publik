@@ -12,6 +12,7 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { phone } from '$lib/phone/phone.svelte';
 	import * as api from '$lib/api';
 	import type { BrowseItem, ExploreItem, PodcastEpisode, PodcastSearchResults, PodcastShow, SearchOverview, SearchResults, SongItem } from '$lib/api';
 	import { Card, ErrorState, Shelf, Skeleton, TrackTable } from '$lib/kit';
@@ -514,7 +515,7 @@
 			{:else}
 				<div class="browse-grid -mx-3 grid">
 					{#each tiles as t, ti (ti + t.href)}
-						<div class="p-3"><BrowseTile title={t.title} color={t.color} image={t.image ?? (t.href === '/browse/podcasts' ? podcastArt : null)} href={t.href} /></div>
+						<div class="p-3"><BrowseTile size={phone.on ? 'sm' : 'lg'} title={t.title} color={t.color} image={t.image ?? (t.href === '/browse/podcasts' ? podcastArt : null)} href={t.href} /></div>
 					{/each}
 					{#if tilesLoading}
 						{#each Array(9) as _, i (i)}
@@ -728,5 +729,16 @@
 	   off or hidden under the next row. A results page holds a few dozen cards; auto rows are fine. */
 	.results-grid {
 		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	}
+	/* Phone (lib/phone): two columns, tighter gaps. */
+	:global(html.phone) .browse-grid,
+	:global(html.phone) .results-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	:global(html.phone) .browse-grid {
+		margin-inline: -6px;
+	}
+	:global(html.phone) .browse-grid > div {
+		padding: 6px;
 	}
 </style>

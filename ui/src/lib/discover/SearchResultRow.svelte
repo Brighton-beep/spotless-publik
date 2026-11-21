@@ -75,7 +75,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 <div
-	class="group grid h-16 grid-cols-[minmax(0,1fr)_minmax(0,250px)] items-center gap-3 rounded-sm px-3 hover:bg-bg-tinted has-[[data-menu-open]]:bg-bg-tinted {item
+	class="group grid h-16 grid-cols-[minmax(0,1fr)_minmax(0,250px)] [.phone_&]:grid-cols-[minmax(0,1fr)_auto] [.phone_&]:px-1 items-center gap-3 rounded-sm px-3 hover:bg-bg-tinted has-[[data-menu-open]]:bg-bg-tinted {item
 		? 'cursor-pointer'
 		: ''}"
 	onclick={open}
@@ -86,7 +86,7 @@
 		<!-- Spotify (2026): a 16:9 85x48 box, the square art centred on a soft blurred copy of itself. -->
 		<button
 			type="button"
-			class="relative grid h-12 w-[85px] shrink-0 place-items-center overflow-hidden rounded-[4px] bg-bg-base"
+			class="relative grid h-12 w-[85px] [.phone_&]:w-12 shrink-0 place-items-center overflow-hidden rounded-[4px] bg-bg-base"
 			aria-label={playing ? 'Pause' : `Play ${title}`}
 			onclick={play}
 		>
@@ -124,7 +124,7 @@
 			{/if}
 		</div>
 	</div>
-	<div class="flex min-w-0 items-center justify-between">
+	<div class="flex min-w-0 items-center justify-between [.phone_&]:gap-2">
 		<span class="inline-flex h-4 items-center rounded-sm bg-bg-tinted px-1 text-xs font-bold text-text-subdued">{badge}</span>
 		{#if item?.kind === 'artist'}
 			<Pill variant="outline" onclick={() => actions.toggleInLibrary(item!)}>{saved ? 'Following' : 'Follow'}</Pill>

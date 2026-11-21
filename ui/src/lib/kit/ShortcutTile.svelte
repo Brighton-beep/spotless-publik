@@ -93,7 +93,7 @@
 			</div>
 		{/if}
 	</div>
-	<div class="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-12 pl-2">
+	<div class="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-12 pl-2 [.phone_&]:pr-2">
 		<!-- a11y: the title is the tile's keyboard entry point (open), like Card's. -->
 		{#if href}
 			<a {href} data-card-primary class="line-clamp-2 text-sm leading-4 font-bold text-white focus-visible:outline-offset-2">{title}</a>

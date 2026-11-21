@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { phone } from '$lib/phone/phone.svelte';
 	/**
 	 * "Your Library" (docs/spotify-spec/screens/library-sidebar.md).
 	 * `mode`: 'sidebar' (left panel; collapses to a 72px rail by `shell.leftCollapsed`) or 'page'
@@ -60,6 +61,8 @@
 	import FolderSimplePlusIcon from 'phosphor-svelte/lib/FolderSimplePlusIcon';
 
 	let { mode = 'sidebar' }: { mode?: 'sidebar' | 'page' } = $props();
+	// The expanded page's Date added / Played columns don't fit a phone: rows stay title + subtitle.
+	const table = $derived(mode === 'page' && !phone.on);
 
 	const collapsed = $derived(mode === 'sidebar' && leftRail());
 	let navWidth = $state(1000);
@@ -422,11 +425,11 @@
 					<!-- Spotify: the + turns into an × while its menu is open -->
 					<IconButton icon={PlusIcon} label="Create" variant="filled" class="[&_svg]:transition-transform [&_svg]:duration-200 [&[data-menu-open]_svg]:rotate-45" onclick={createMenu} />
 				{/if}
-				<IconButton
+				{#if !phone.on}<IconButton
 					icon={mode === 'page' ? ArrowsInSimpleIcon : ArrowsOutSimpleIcon}
 					label={mode === 'page' ? 'Show less' : 'Expand Your Library'}
 					onclick={() => (shell.libraryExpanded = mode !== 'page')}
-				/>
+				/>{/if}
 			</div>
 		</div>
 
@@ -636,7 +639,7 @@
 				{/each}
 			</div>
 		{:else}
-			{#if mode === 'page' && view !== 'compact'}
+			{#if table && view !== 'compact'}
 				<div role="row" class="mb-2 flex h-9 items-center gap-3 border-b border-white/10 px-2 text-sm text-text-subdued">
 					<span role="columnheader" class="flex-1 pl-[60px]">Title</span>
 					<span role="columnheader" class="w-40 shrink-0">Date added</span>
@@ -691,7 +694,7 @@
 							</div>
 						</div>
 					{/if}
-					{#if mode === 'page' && view !== 'compact'}
+					{#if table && view !== 'compact'}
 						<span class="w-40 shrink-0 truncate text-sm text-text-subdued">{fmtDate(r.addedAt)}</span>
 						<span class="w-40 shrink-0 truncate text-sm text-text-subdued">{fmtAgo(r.playedAt)}</span>
 					{/if}

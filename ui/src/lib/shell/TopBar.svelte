@@ -526,7 +526,7 @@
 					>
 						<Icon icon={XIcon} size={24} />
 					</button>
-				{:else if focused}
+				{:else if focused && !phone.on}
 					<span class="mr-3 flex gap-1 text-xs text-text-subdued">
 						<span class="kbd !h-5 !min-w-5 !text-xs !leading-4">⌘</span><span class="kbd !h-5 !min-w-5 !text-xs !leading-4">K</span>
 					</span>

@@ -834,3 +834,8 @@ input[type='range'].range:focus-visible::-webkit-slider-thumb {
 img[data-img-broken] {
 	visibility: hidden;
 }
+
+/* Phone (lib/phone): tighter page gutters. */
+html.phone {
+	--spacing-home-gutter: 16px;
+}
