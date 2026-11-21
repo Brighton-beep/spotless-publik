@@ -65,6 +65,10 @@
 	import { initMenubar } from '$lib/shell/menubar';
 	import { requestFind } from '$lib/shell/find.svelte';
 	import { installImageGuard } from '$lib/imgguard';
+	import { phone } from '$lib/phone/phone.svelte';
+	import PhoneTabBar from '$lib/phone/TabBar.svelte';
+	import PhoneMiniBar from '$lib/phone/MiniBar.svelte';
+	import PhoneNowPlaying from '$lib/phone/NowPlayingSheet.svelte';
 
 	// SvelteKit `snapshot` keyed to the history entry: back/forward restores the main panel's scroll.
 	let scroller = $state<HTMLElement | null>(null);
@@ -248,6 +252,49 @@
 	{#await import('$lib/components/MiniPlayer.svelte') then m}<m.default />{/await}
 {:else}
 	<Tooltip.Provider delayDuration={500} skipDelayDuration={300} disableHoverableContent>
+		{#if phone.on}
+			<!-- The phone layout (lib/phone): one page at a time under a compact top bar, the mini player
+			     and tabs at the bottom, Now Playing as a full-screen sheet. Insets keep it clear of the
+			     status and navigation bars (the app draws edge to edge). -->
+			<div
+				data-app-shell
+				class="flex h-dvh w-screen flex-col overflow-hidden bg-bg-app text-white"
+				style="padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)"
+			>
+				<TopBar />
+				<div class="relative min-h-0 flex-1">
+					<main
+						id="main-view"
+						tabindex="-1"
+						data-app-main
+						data-main-scroll
+						class="scroll-area relative h-full min-w-0 overflow-x-hidden overflow-y-auto bg-bg-base outline-none [container-type:inline-size]"
+						style="--content-spacing:{contentSpacing}px"
+						inert={shell.lyricsOpen && !!playback.now}
+						bind:this={scroller}
+						{@attach observeWidth}
+					>
+						{#if shell.libraryExpanded}
+							<div class="h-full"><LibrarySidebar mode="page" /></div>
+						{:else}
+							{#key `${auth.epoch}:${ui.epoch}`}
+								{@render children()}
+							{/key}
+						{/if}
+					</main>
+					{#if shell.lyricsOpen && playback.now}
+						<div class="absolute inset-0 z-10 overflow-hidden" role="main" aria-label="Lyrics">
+							<h1 class="visually-hidden">Lyrics</h1>
+							{#await lazyDialogs.lyrics() then m}<m.default />{/await}
+						</div>
+					{/if}
+				</div>
+				<PhoneMiniBar />
+				<PhoneTabBar />
+				<VideoSurface />
+			</div>
+			{#if phone.nowPlaying}<PhoneNowPlaying />{/if}
+		{:else}
 		<div
 			data-app-shell
 			class="grid h-screen w-screen overflow-hidden bg-bg-app px-2 pb-2 text-white {shell.resizing
@@ -333,6 +380,7 @@
 				<!-- Owns the one <video> element; renders a zero-size parking box until borrowed. -->
 				<VideoSurface />
 		</div>
+		{/if}
 
 		{#if ui.theaterOpen && playback.now}
 			{#await lazyDialogs.theater() then m}<m.default />{/await}

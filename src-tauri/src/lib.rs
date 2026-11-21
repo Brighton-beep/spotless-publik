@@ -900,6 +900,12 @@ pub fn run() {
             #[cfg(mobile)]
             {
                 let _ = commands::APP.set(handle.clone());
+                // publik keeps its sign-in under $XDG_CONFIG_HOME or $HOME, and an Android app has
+                // neither: the key was never saved, so a sign-in finished in the browser was lost
+                // whenever Android stopped the app meanwhile. Give it the app's own config folder.
+                if let Ok(dir) = app.path().app_config_dir() {
+                    std::env::set_var("XDG_CONFIG_HOME", dir);
+                }
                 let h = handle.clone();
                 let _ = publik::gate::URL_OPENER.set(Box::new(move |url: &str| {
                     use tauri_plugin_opener::OpenerExt;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { phone } from '$lib/phone/phone.svelte';
 	/**
 	 * Top bar (shell-layout.md): 64px on black. macOS traffic lights float over its left end
 	 * (titleBarStyle Overlay), then back/forward, logo; centred: Home (48px circle) + search pill
@@ -417,12 +418,12 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <header
 	data-window-drag
-	class="relative z-30 flex h-16 shrink-0 items-center justify-between px-2 select-none"
+	class="relative z-30 flex shrink-0 items-center select-none {phone.on ? 'h-14 gap-1 px-1' : 'h-16 justify-between px-2'}"
 	onmousedown={chromeDown}
 	onmouseup={chromeUp}
 >
 	<!-- Left: (traffic lights) back / forward / logo -->
-	<div class="flex items-center gap-2 {win.chrome === 'overlay' ? 'pl-[80px]' : 'pl-4'}">
+	<div class="flex items-center gap-2 {phone.on ? '' : win.chrome === 'overlay' ? 'pl-[80px]' : 'pl-4'}">
 		<IconButton
 			icon={CaretLeftIcon}
 			label="Go back"
@@ -432,6 +433,8 @@
 			class="!bg-black/0"
 			onclick={() => history.back()}
 		/>
+		<!-- Phone (lib/phone): back only; Android's back gesture goes forward-less, and Home is a tab. -->
+		{#if !phone.on}
 		<IconButton
 			icon={CaretRightIcon}
 			label="Go forward"
@@ -446,10 +449,16 @@
 				</a>
 			{/snippet}
 		</Tooltip>
+		{/if}
 	</div>
 
-	<!-- Centre: home + search (centred in the window) -->
-	<div class="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
+	<!-- Centre: home + search (centred in the window; on a phone, the width between back and avatar) -->
+	<div
+		class={phone.on
+			? 'flex min-w-0 flex-1 items-center'
+			: 'absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2'}
+	>
+		{#if !phone.on}
 		<Tooltip text="Home" side="bottom">
 			{#snippet trigger(props)}
 				<a
@@ -464,7 +473,8 @@
 				</a>
 			{/snippet}
 		</Tooltip>
-		<div class="relative w-[clamp(240px,34vw,474px)]">
+		{/if}
+		<div class="relative {phone.on ? 'min-w-0 flex-1' : 'w-[clamp(240px,34vw,474px)]'}">
 			<form
 				role="search"
 				class="group/search flex h-12 items-center rounded-full bg-bg-highlight pr-3 pl-3 transition-colors hover:bg-bg-elevated-highlight hover:shadow-[inset_0_0_0_1px_#535353] focus-within:!bg-bg-elevated-highlight focus-within:!shadow-[inset_0_0_0_2px_#fff]"

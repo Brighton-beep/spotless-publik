@@ -65,8 +65,11 @@ $apk = Get-ChildItem "$root\src-tauri\gen\android\app\build\outputs\apk\arm64\$(
 Write-Host ("APK: {0} ({1:N0} MB)" -f $apk.FullName, ($apk.Length / 1MB))
 
 if (-not $NoInstall) {
-    if ($Device) { adb connect $Device | Out-Host }
-    adb install -r $apk.FullName
+    # Named explicitly: one phone often shows up twice (its Tailscale address and the one adb finds
+    # on the local network), and a bare `adb install` refuses to pick.
+    $sel = @()
+    if ($Device) { adb connect $Device | Out-Host; $sel = @('-s', $Device) }
+    adb @sel install -r $apk.FullName
     if ($LASTEXITCODE) { throw 'adb install failed' }
-    adb shell monkey -p app.spotless.android -c android.intent.category.LAUNCHER 1 | Out-Null
+    adb @sel shell monkey -p app.spotless.android -c android.intent.category.LAUNCHER 1 | Out-Null
 }

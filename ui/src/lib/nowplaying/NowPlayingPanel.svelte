@@ -39,6 +39,11 @@
 	import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
 	import MonitorPlayIcon from 'phosphor-svelte/lib/MonitorPlayIcon';
 	import MusicNotesIcon from 'phosphor-svelte/lib/MusicNotesIcon';
+	import type { Snippet } from 'svelte';
+
+	// The phone's full-screen Now Playing (lib/phone) puts its progress bar and controls under the
+	// title, and shows the queue as its own sheet. The desktop panel passes neither.
+	let { controls, onqueue }: { controls?: Snippet; onqueue?: () => void } = $props();
 
 	const now = $derived(playback.now);
 	const song = $derived(now ? nowPlayingSong() : null);
@@ -144,6 +149,8 @@
 				{/if}
 			</div>
 
+			{@render controls?.()}
+
 			{#if offersLyrics(now)}
 				<LyricsPreviewCard />
 			{/if}
@@ -167,7 +174,7 @@
 						<button
 							type="button"
 							class="text-sm font-bold text-text-subdued hover:text-white hover:underline"
-							onclick={() => openRight('queue')}>Open queue</button
+							onclick={() => (onqueue ? onqueue() : openRight('queue'))}>Open queue</button
 						>
 					</div>
 					<div class="-mx-2" role="grid" aria-label="Next in queue">
